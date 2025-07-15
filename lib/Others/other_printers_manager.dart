@@ -18,7 +18,8 @@ class OtherPrinterManager {
     return _instance!;
   }
 
-  final StreamController<List<Printer>> _devicesstream = StreamController<List<Printer>>.broadcast();
+  final StreamController<List<Printer>> _devicesstream =
+      StreamController<List<Printer>>.broadcast();
 
   Stream<List<Printer>> get devicesStream => _devicesstream.stream;
   StreamSubscription? subscription;
@@ -115,8 +116,10 @@ class OtherPrinterManager {
           return;
         }
 
-        final services =
-            (await device.discoverServices()).skipWhile((value) => value.characteristics.where((element) => element.properties.write).isEmpty);
+        final services = (await device.discoverServices()).skipWhile((value) =>
+            value.characteristics
+                .where((element) => element.properties.write)
+                .isEmpty);
 
         BluetoothCharacteristic? writeCharacteristic;
         for (var service in services) {
@@ -142,7 +145,8 @@ class OtherPrinterManager {
 
           await writeCharacteristic.write(
             Uint8List.fromList(chunk),
-            withoutResponse: true,
+            withoutResponse: longData ? false : true,
+            allowLongWrite: longData,
           );
         }
 
@@ -181,7 +185,8 @@ class OtherPrinterManager {
 
   Future<void> _getUSBPrinters() async {
     try {
-      final devices = await FlutterThermalPrinterPlatform.instance.startUsbScan();
+      final devices =
+          await FlutterThermalPrinterPlatform.instance.startUsbScan();
 
       List<Printer> usbPrinters = [];
       for (var map in devices) {
@@ -193,7 +198,8 @@ class OtherPrinterManager {
           address: map['vendorId'].toString(),
           isConnected: map['connected'] ?? false,
         );
-        printer.isConnected = await FlutterThermalPrinterPlatform.instance.isConnected(printer);
+        printer.isConnected =
+            await FlutterThermalPrinterPlatform.instance.isConnected(printer);
         usbPrinters.add(printer);
       }
 
@@ -296,7 +302,8 @@ class OtherPrinterManager {
   }
 
   void _updateOrAddPrinter(Printer printer) {
-    final index = _devices.indexWhere((device) => device.address == printer.address);
+    final index =
+        _devices.indexWhere((device) => device.address == printer.address);
     if (index == -1) {
       _devices.add(printer);
     } else {
@@ -306,7 +313,8 @@ class OtherPrinterManager {
   }
 
   void sortDevices() {
-    _devices.removeWhere((element) => element.name == null || element.name == '');
+    _devices
+        .removeWhere((element) => element.name == null || element.name == '');
     // remove items having same vendorId
     Set<String> seen = {};
     _devices.retainWhere((element) {
