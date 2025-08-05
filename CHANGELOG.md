@@ -1,5 +1,51 @@
-## 1.2.1+1
-* Updated the read me file
+## 1.2.2 - Optimized Version
+
+* **Enhanced Memory Management**
+  - Proper stream lifecycle management with automatic cleanup
+  - Improved resource disposal in disconnect operations
+  - Optimized singleton pattern for thread safety
+  - Better garbage collection patterns
+
+* **Image Processing Improvements**
+  - Dynamic chunked image processing for better memory efficiency
+  - Improved image validation with comprehensive error handling
+  - Optimized image resizing algorithms
+  - Better support for varying image dimensions
+
+* **Network Printer Enhancements**
+  - Automatic connection validation and reconnection
+  - Improved socket error handling with specific exception types
+  - Better connection state management
+  - Enhanced timeout handling
+
+* **Code Architecture Improvements**
+  - Immutable Printer model with validation methods
+  - Separated concerns into focused, testable methods
+  - Enhanced error handling with meaningful messages
+  - Comprehensive documentation and type safety
+
+* **Platform-Specific Optimizations**
+  - Windows: Enhanced BLE initialization with proper error handling
+  - Android/iOS: Optimized BLE scanning with better subscription management
+  - All Platforms: Improved USB printer detection and management
+
+* **New Features**
+  - `copyWith()` method for immutable Printer updates
+  - `uniqueId` property for better printer identification
+  - `hasValidConnectionData` validation method
+  - Enhanced connection type validation
+  - Comprehensive toString() and equality implementations
+
+* **Breaking Changes**
+  - Printer class fields are now final (immutable)
+  - Use `copyWith()` for printer updates instead of direct field assignment
+  - Some internal method signatures have changed for better error handling
+
+* **Developer Experience**
+  - Added OPTIMIZATION_GUIDE.md with detailed optimization explanations
+  - Enhanced analysis_options.yaml with strict linting rules
+  - Improved error messages for better debugging
+  - Better type safety throughout the codebase
 
 ## 1.2.1
 * Fixed the issue of Flutter Blue plus for windows as it not supported for windows

@@ -5,27 +5,45 @@ import 'dart:typed_data';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_thermal_printer/Windows/window_printer_manager.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
 
 import 'Others/other_printers_manager.dart';
+import 'Windows/window_printer_manager.dart';
+import 'utils/printer.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 export 'package:flutter_blue_plus/flutter_blue_plus.dart'
     show BluetoothDevice, BluetoothConnectionState;
 export 'package:flutter_thermal_printer/network/network_printer.dart';
 
+/// Main class for thermal printer operations across all platforms
+///
+/// This class provides a unified interface for printing operations
+/// on Windows (USB/BLE) and other platforms (Android/iOS/macOS).
 class FlutterThermalPrinter {
   FlutterThermalPrinter._();
 
   static FlutterThermalPrinter? _instance;
 
+  /// Singleton instance with improved initialization
   static FlutterThermalPrinter get instance {
-    if (!Platform.isWindows) FlutterBluePlus.setLogLevel(LogLevel.debug);
-    _instance ??= FlutterThermalPrinter._();
+    if (_instance == null) {
+      _instance = FlutterThermalPrinter._();
+      _initializeLogLevel();
+    }
     return _instance!;
+  }
+
+  /// Initialize log level for non-Windows platforms
+  static void _initializeLogLevel() {
+    if (!Platform.isWindows) {
+      try {
+        FlutterBluePlus.setLogLevel(LogLevel.debug);
+      } catch (e) {
+        // Silently handle log level initialization errors
+      }
+    }
   }
 
   Stream<List<Printer>> get devicesStream {
@@ -38,9 +56,9 @@ class FlutterThermalPrinter {
 
   Future<bool> connect(Printer device) async {
     if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.connect(device);
+      return WindowPrinterManager.instance.connect(device);
     } else {
-      return await OtherPrinterManager.instance.connect(device);
+      return OtherPrinterManager.instance.connect(device);
     }
   }
 
@@ -58,13 +76,13 @@ class FlutterThermalPrinter {
     bool longData = false,
   }) async {
     if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.printData(
+      return WindowPrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
       );
     } else {
-      return await OtherPrinterManager.instance.printData(
+      return OtherPrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
@@ -76,17 +94,17 @@ class FlutterThermalPrinter {
     Duration refreshDuration = const Duration(seconds: 2),
     List<ConnectionType> connectionTypes = const [
       ConnectionType.USB,
-      ConnectionType.BLE
+      ConnectionType.BLE,
     ],
     bool androidUsesFineLocation = false,
   }) async {
     if (Platform.isWindows) {
-      WindowPrinterManager.instance.getPrinters(
+      await WindowPrinterManager.instance.getPrinters(
         refreshDuration: refreshDuration,
         connectionTypes: connectionTypes,
       );
     } else {
-      OtherPrinterManager.instance.getPrinters(
+      await OtherPrinterManager.instance.getPrinters(
         connectionTypes: connectionTypes,
         androidUsesFineLocation: androidUsesFineLocation,
       );
@@ -95,9 +113,9 @@ class FlutterThermalPrinter {
 
   Future<void> stopScan() async {
     if (Platform.isWindows) {
-      WindowPrinterManager.instance.stopscan();
+      await WindowPrinterManager.instance.stopscan();
     } else {
-      OtherPrinterManager.instance.stopScan();
+      await OtherPrinterManager.instance.stopScan();
     }
   }
 
@@ -121,12 +139,13 @@ class FlutterThermalPrinter {
   // Get BleState
   Future<bool> isBleTurnedOn() async {
     if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.isBleTurnedOn();
+      return WindowPrinterManager.instance.isBleTurnedOn();
     } else {
       return FlutterBluePlus.adapterStateNow == BluetoothAdapterState.on;
     }
   }
 
+  /// Optimized screen capture and conversion to printer-ready bytes
   Future<Uint8List> screenShotWidget(
     BuildContext context, {
     required Widget widget,
@@ -136,56 +155,82 @@ class FlutterThermalPrinter {
     Generator? generator,
   }) async {
     final controller = ScreenshotController();
-    final image = await controller.captureFromLongWidget(widget,
-        pixelRatio: View.of(context).devicePixelRatio, delay: delay);
-    Generator? generator0;
-    if (generator == null) {
+
+    try {
+      final image = await controller.captureFromLongWidget(
+        widget,
+        pixelRatio: View.of(context).devicePixelRatio,
+        delay: delay,
+      );
+
       final profile = await CapabilityProfile.load();
-      generator0 = Generator(paperSize, profile);
-    } else {
-      final profile = await CapabilityProfile.load();
-      generator0 = Generator(paperSize, profile);
+      final generator0 = generator ?? Generator(paperSize, profile);
+
+      var imagebytes = img.decodeImage(image);
+      if (imagebytes == null) {
+        throw Exception('Failed to decode captured image');
+      }
+
+      // Apply custom width if specified
+      if (customWidth != null) {
+        final width = _makeDivisibleBy8(customWidth);
+        imagebytes = img.copyResize(imagebytes, width: width);
+      }
+
+      // Ensure image width is compatible with thermal printers
+      imagebytes = _buildImageRasterAvailable(imagebytes);
+      imagebytes = img.grayscale(imagebytes);
+
+      // Process image in optimized chunks
+      return _processImageInChunks(imagebytes, generator0);
+    } catch (e) {
+      throw Exception('Failed to capture widget screenshot: $e');
     }
-    img.Image? imagebytes = img.decodeImage(image);
+  }
 
-    if (customWidth != null) {
-      final width = _makeDivisibleBy8(customWidth);
-      imagebytes = img.copyResize(imagebytes!, width: width);
-    }
+  /// Process image in optimized chunks for better memory management
+  Uint8List _processImageInChunks(img.Image image, Generator generator) {
+    const chunkHeight = 30;
+    final totalHeight = image.height;
+    final totalWidth = image.width;
+    final chunksCount = (totalHeight / chunkHeight).ceil();
 
-    imagebytes = _buildImageRasterAvaliable(imagebytes!);
+    final bytes = <int>[];
 
-    imagebytes = img.grayscale(imagebytes);
-    final totalheight = imagebytes.height;
-    final totalwidth = imagebytes.width;
-    final timestoCut = totalheight ~/ 30;
-    List<int> bytes = [];
-    for (var i = 0; i < timestoCut; i++) {
+    for (var i = 0; i < chunksCount; i++) {
+      final startY = i * chunkHeight;
+      final endY = (startY + chunkHeight > totalHeight)
+          ? totalHeight
+          : startY + chunkHeight;
+      final actualHeight = endY - startY;
+
       final croppedImage = img.copyCrop(
-        imagebytes,
+        image,
         x: 0,
-        y: i * 30,
-        width: totalwidth,
-        height: 30,
+        y: startY,
+        width: totalWidth,
+        height: actualHeight,
       );
-      final raster = generator0.imageRaster(
+
+      final raster = generator.imageRaster(
         croppedImage,
-        imageFn: PosImageFn.bitImageRaster,
       );
-      bytes += raster;
+      bytes.addAll(raster);
     }
+
     return Uint8List.fromList(bytes);
   }
 
-  img.Image _buildImageRasterAvaliable(img.Image image) {
-    final avaliable = image.width % 8 == 0;
-    if (avaliable) {
+  /// Ensure image width is compatible with thermal printers (divisible by 8)
+  img.Image _buildImageRasterAvailable(img.Image image) {
+    if (image.width % 8 == 0) {
       return image;
     }
     final newWidth = _makeDivisibleBy8(image.width);
     return img.copyResize(image, width: newWidth);
   }
 
+  /// Make number divisible by 8 for printer compatibility
   int _makeDivisibleBy8(int number) {
     if (number % 8 == 0) {
       return number;
@@ -193,6 +238,7 @@ class FlutterThermalPrinter {
     return number + (8 - (number % 8));
   }
 
+  /// Optimized widget printing with better resource management
   Future<void> printWidget(
     BuildContext context, {
     required Printer printer,
@@ -203,77 +249,120 @@ class FlutterThermalPrinter {
     bool printOnBle = false,
     bool cutAfterPrinted = true,
   }) async {
-    // if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
-    //   throw Exception(
-    //     "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
-    //   );
-    // }
     final controller = ScreenshotController();
 
-    final image = await controller.captureFromLongWidget(
-      widget,
-      pixelRatio: View.of(context).devicePixelRatio,
-      delay: delay,
-    );
-    if (printer.connectionType == ConnectionType.BLE) {
-      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-      final ticket = Generator(paperSize, profile0);
-      img.Image? imagebytes = img.decodeImage(image);
-      imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final raster = ticket.imageRaster(
-        imagebytes,
-        imageFn: PosImageFn.bitImageRaster,
+    try {
+      final image = await controller.captureFromLongWidget(
+        widget,
+        pixelRatio: View.of(context).devicePixelRatio,
+        delay: delay,
       );
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        raster,
-        longData: true,
-      );
-      return;
-    }
-    if (Platform.isWindows) {
-      await printData(
-        printer,
-        image.toList(),
-        longData: true,
-      );
-    } else {
-      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-      final ticket = Generator(paperSize, profile0);
-      img.Image? imagebytes = img.decodeImage(image);
-      imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final totalheight = imagebytes.height;
-      final totalwidth = imagebytes.width;
-      final timestoCut = totalheight ~/ 30;
 
-      for (var i = 0; i < timestoCut; i++) {
-        final croppedImage = img.copyCrop(
-          imagebytes,
-          x: 0,
-          y: i * 30,
-          width: totalwidth,
-          height: 30,
-        );
-        final raster = ticket.imageRaster(
-          croppedImage,
-          imageFn: PosImageFn.bitImageRaster,
-        );
-        await FlutterThermalPrinter.instance.printData(
+      // Handle BLE printing with single raster approach
+      if (printer.connectionType == ConnectionType.BLE) {
+        await _printBLEWidget(image, printer, paperSize, profile);
+        return;
+      }
+
+      // Handle Windows printing
+      if (Platform.isWindows) {
+        await printData(
           printer,
-          raster,
+          image.toList(),
           longData: true,
         );
+        return;
       }
-      if (cutAfterPrinted) {
-        await FlutterThermalPrinter.instance.printData(
-          printer,
-          ticket.cut(),
-          longData: true,
-        );
-      }
+
+      // Handle other platforms with chunked approach
+      await _printChunkedWidget(
+        image,
+        printer,
+        paperSize,
+        profile,
+        cutAfterPrinted,
+      );
+    } catch (e) {
+      throw Exception('Failed to print widget: $e');
     }
   }
 
+  /// Print widget on BLE devices using single raster approach
+  Future<void> _printBLEWidget(
+    Uint8List image,
+    Printer printer,
+    PaperSize paperSize,
+    CapabilityProfile? profile,
+  ) async {
+    final profile0 = profile ?? await CapabilityProfile.load();
+    final ticket = Generator(paperSize, profile0);
+
+    var imagebytes = img.decodeImage(image);
+    if (imagebytes == null) {
+      throw Exception('Failed to decode image for BLE printing');
+    }
+
+    imagebytes = _buildImageRasterAvailable(imagebytes);
+    final raster = ticket.imageRaster(
+      imagebytes,
+    );
+
+    await printData(printer, raster, longData: true);
+  }
+
+  /// Print widget using chunked approach for better memory management
+  Future<void> _printChunkedWidget(
+    Uint8List image,
+    Printer printer,
+    PaperSize paperSize,
+    CapabilityProfile? profile,
+    bool cutAfterPrinted,
+  ) async {
+    final profile0 = profile ?? await CapabilityProfile.load();
+    final ticket = Generator(paperSize, profile0);
+
+    var imagebytes = img.decodeImage(image);
+    if (imagebytes == null) {
+      throw Exception('Failed to decode image for chunked printing');
+    }
+
+    imagebytes = _buildImageRasterAvailable(imagebytes);
+
+    const chunkHeight = 30;
+    final totalHeight = imagebytes.height;
+    final totalWidth = imagebytes.width;
+    final chunksCount = (totalHeight / chunkHeight).ceil();
+
+    // Print image in chunks
+    for (var i = 0; i < chunksCount; i++) {
+      final startY = i * chunkHeight;
+      final endY = (startY + chunkHeight > totalHeight)
+          ? totalHeight
+          : startY + chunkHeight;
+      final actualHeight = endY - startY;
+
+      final croppedImage = img.copyCrop(
+        imagebytes,
+        x: 0,
+        y: startY,
+        width: totalWidth,
+        height: actualHeight,
+      );
+
+      final raster = ticket.imageRaster(
+        croppedImage,
+      );
+
+      await printData(printer, raster, longData: true);
+    }
+
+    // Add cut command if requested
+    if (cutAfterPrinted) {
+      await printData(printer, ticket.cut(), longData: true);
+    }
+  }
+
+  /// Optimized image bytes printing with validation and error handling
   Future<void> printImageBytes({
     required Uint8List imageBytes,
     required Printer printer,
@@ -284,48 +373,85 @@ class FlutterThermalPrinter {
     bool printOnBle = false,
     int? customWidth,
   }) async {
-    if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
+    // Validate BLE printing settings
+    if (!printOnBle && printer.connectionType == ConnectionType.BLE) {
       throw Exception(
-        "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
+        'Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true',
       );
     }
 
-    if (Platform.isWindows) {
-      await printData(
+    try {
+      // Handle Windows printing
+      if (Platform.isWindows) {
+        await printData(printer, imageBytes.toList(), longData: true);
+        return;
+      }
+
+      // Handle other platforms
+      await _printImageBytesOtherPlatforms(
+        imageBytes,
         printer,
-        imageBytes.toList(),
-        longData: true,
+        paperSize,
+        profile,
+        generator,
+        customWidth,
       );
-    } else {
-      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-      final ticket = generator ?? Generator(paperSize, profile0);
-      img.Image? imagebytes = img.decodeImage(imageBytes);
-      if (customWidth != null) {
-        final width = _makeDivisibleBy8(customWidth);
-        imagebytes = img.copyResize(imagebytes!, width: width);
-      }
-      imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final totalheight = imagebytes.height;
-      final totalwidth = imagebytes.width;
-      final timestoCut = totalheight ~/ 30;
-      for (var i = 0; i < timestoCut; i++) {
-        final croppedImage = img.copyCrop(
-          imagebytes,
-          x: 0,
-          y: i * 30,
-          width: totalwidth,
-          height: 30,
-        );
-        final raster = ticket.imageRaster(
-          croppedImage,
-          imageFn: PosImageFn.bitImageRaster,
-        );
-        await FlutterThermalPrinter.instance.printData(
-          printer,
-          raster,
-          longData: true,
-        );
-      }
+    } catch (e) {
+      throw Exception('Failed to print image bytes: $e');
+    }
+  }
+
+  /// Print image bytes on non-Windows platforms
+  Future<void> _printImageBytesOtherPlatforms(
+    Uint8List imageBytes,
+    Printer printer,
+    PaperSize paperSize,
+    CapabilityProfile? profile,
+    Generator? generator,
+    int? customWidth,
+  ) async {
+    final profile0 = profile ?? await CapabilityProfile.load();
+    final ticket = generator ?? Generator(paperSize, profile0);
+
+    var imagebytes = img.decodeImage(imageBytes);
+    if (imagebytes == null) {
+      throw Exception('Failed to decode image bytes');
+    }
+
+    // Apply custom width if specified
+    if (customWidth != null) {
+      final width = _makeDivisibleBy8(customWidth);
+      imagebytes = img.copyResize(imagebytes, width: width);
+    }
+
+    imagebytes = _buildImageRasterAvailable(imagebytes);
+
+    const chunkHeight = 30;
+    final totalHeight = imagebytes.height;
+    final totalWidth = imagebytes.width;
+    final chunksCount = (totalHeight / chunkHeight).ceil();
+
+    // Print in optimized chunks
+    for (var i = 0; i < chunksCount; i++) {
+      final startY = i * chunkHeight;
+      final endY = (startY + chunkHeight > totalHeight)
+          ? totalHeight
+          : startY + chunkHeight;
+      final actualHeight = endY - startY;
+
+      final croppedImage = img.copyCrop(
+        imagebytes,
+        x: 0,
+        y: startY,
+        width: totalWidth,
+        height: actualHeight,
+      );
+
+      final raster = ticket.imageRaster(
+        croppedImage,
+      );
+
+      await printData(printer, raster, longData: true);
     }
   }
 }

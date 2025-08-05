@@ -1,56 +1,101 @@
 import 'dart:io';
 import 'network_print_result.dart';
 
+/// Optimized network thermal printer with improved connection management
 class FlutterThermalPrinterNetwork {
-  late String _host;
-  int _port = 9100;
-  bool _isConnected = false;
-  Duration _timeout = const Duration(seconds: 5);
-  late Socket _socket;
-
   FlutterThermalPrinterNetwork(
     String host, {
     int port = 9100,
     Duration timeout = const Duration(seconds: 5),
-  }) {
-    _host = host;
-    _port = port;
-    _timeout = timeout;
-  }
+  })  : _host = host,
+        _port = port,
+        _timeout = timeout;
+  final String _host;
+  final int _port;
+  final Duration _timeout;
 
-  Future<NetworkPrintResult> connect({Duration? timeout = const Duration(seconds: 5)}) async {
+  bool _isConnected = false;
+  Socket? _socket;
+
+  /// Connect to network printer with improved error handling
+  Future<NetworkPrintResult> connect({
+    Duration? timeout,
+  }) async {
+    if (_isConnected && _socket != null) {
+      return NetworkPrintResult.success;
+    }
+
     try {
-      _socket = await Socket.connect(_host, _port, timeout: _timeout);
+      _socket = await Socket.connect(
+        _host,
+        _port,
+        timeout: timeout ?? _timeout,
+      );
       _isConnected = true;
-      return Future<NetworkPrintResult>.value(NetworkPrintResult.success);
+      return NetworkPrintResult.success;
+    } on SocketException {
+      _isConnected = false;
+      return NetworkPrintResult.timeout;
     } catch (e) {
       _isConnected = false;
-      return Future<NetworkPrintResult>.value(NetworkPrintResult.timeout);
+      return NetworkPrintResult.timeout;
     }
   }
 
-  Future<NetworkPrintResult> printTicket(List<int> data, {bool isDisconnect = true}) async {
+  /// Print data with automatic connection management
+  Future<NetworkPrintResult> printTicket(
+    List<int> data, {
+    bool isDisconnect = true,
+  }) async {
     try {
-      if (!_isConnected) {
-        await connect();
+      if (!_isConnected || _socket == null) {
+        final connectResult = await connect();
+        if (connectResult != NetworkPrintResult.success) {
+          return connectResult;
+        }
       }
-      _socket.add(data);
+
+      _socket!.add(data);
+      await _socket!.flush();
+
       if (isDisconnect) {
         await disconnect();
       }
-      return Future<NetworkPrintResult>.value(NetworkPrintResult.success);
+
+      return NetworkPrintResult.success;
+    } on SocketException {
+      _isConnected = false;
+      return NetworkPrintResult.timeout;
     } catch (e) {
-      return Future<NetworkPrintResult>.value(NetworkPrintResult.timeout);
+      return NetworkPrintResult.timeout;
     }
   }
 
+  /// Disconnect with proper resource cleanup
   Future<NetworkPrintResult> disconnect({Duration? timeout}) async {
-    await _socket.flush();
-    await _socket.close();
-    _isConnected = false;
-    if (timeout != null) {
-      await Future.delayed(timeout, () => null);
+    try {
+      if (_socket != null) {
+        await _socket!.flush();
+        await _socket!.close();
+        _socket = null;
+      }
+      _isConnected = false;
+
+      if (timeout != null) {
+        await Future.delayed(timeout);
+      }
+
+      return NetworkPrintResult.success;
+    } catch (e) {
+      _isConnected = false;
+      _socket = null;
+      return NetworkPrintResult.success; // Still consider it successful cleanup
     }
-    return Future<NetworkPrintResult>.value(NetworkPrintResult.success);
   }
+
+  /// Check if currently connected
+  bool get isConnected => _isConnected && _socket != null;
+
+  /// Get connection info
+  String get connectionInfo => '$_host:$_port';
 }

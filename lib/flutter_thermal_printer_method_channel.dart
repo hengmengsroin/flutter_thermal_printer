@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
 
 import 'flutter_thermal_printer_platform_interface.dart';
+import 'utils/printer.dart';
 
 /// An implementation of [FlutterThermalPrinterPlatform] that uses method channels.
 class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
@@ -18,48 +18,46 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   }
 
   @override
-  Future<dynamic> startUsbScan() async {
-    return await methodChannel.invokeMethod('getUsbDevicesList');
-  }
+  Future<dynamic> startUsbScan() async =>
+      methodChannel.invokeMethod('getUsbDevicesList');
 
   @override
-  Future<bool> connect(Printer device) async {
-    return await methodChannel.invokeMethod('connect', {
-      "vendorId": device.vendorId.toString(),
-      "productId": device.productId.toString(),
-    });
-  }
+  Future<bool> connect(Printer device) async =>
+      await methodChannel.invokeMethod('connect', {
+        'vendorId': device.vendorId.toString(),
+        'productId': device.productId.toString(),
+      });
 
   @override
-  Future<bool> printText(Printer device, Uint8List data, {String? path}) async {
-    return await methodChannel.invokeMethod('printText', {
-      "vendorId": device.vendorId.toString(),
-      "productId": device.productId.toString(),
-      "data": List<int>.from(data),
-      "path": path ?? "",
-    });
-  }
+  Future<bool> printText(
+    Printer device,
+    Uint8List data, {
+    String? path,
+  }) async =>
+      await methodChannel.invokeMethod('printText', {
+        'vendorId': device.vendorId.toString(),
+        'productId': device.productId.toString(),
+        'data': List<int>.from(data),
+        'path': path ?? '',
+      });
 
   @override
-  Future<bool> isConnected(Printer device) async {
-    return await methodChannel.invokeMethod('isConnected', {
-      "vendorId": device.vendorId.toString(),
-      "productId": device.productId.toString(),
-    });
-  }
+  Future<bool> isConnected(Printer device) async =>
+      await methodChannel.invokeMethod('isConnected', {
+        'vendorId': device.vendorId.toString(),
+        'productId': device.productId.toString(),
+      });
 
   @override
-  Future<dynamic> convertImageToGrayscale(Uint8List? value) async {
-    return await methodChannel.invokeMethod('convertimage', {
-      "path": List<int>.from(value!),
-    });
-  }
+  Future<dynamic> convertImageToGrayscale(Uint8List? value) async =>
+      methodChannel.invokeMethod('convertimage', {
+        'path': List<int>.from(value!),
+      });
 
   @override
-  Future<bool> disconnect(Printer device) async {
-    return await methodChannel.invokeMethod('disconnect', {
-      "vendorId": device.vendorId.toString(),
-      "productId": device.productId.toString(),
-    });
-  }
+  Future<bool> disconnect(Printer device) async =>
+      await methodChannel.invokeMethod('disconnect', {
+        'vendorId': device.vendorId.toString(),
+        'productId': device.productId.toString(),
+      });
 }

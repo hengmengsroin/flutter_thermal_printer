@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_foreach
+
 import 'dart:async';
 import 'dart:developer';
 import 'dart:io';
@@ -5,9 +7,12 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
-import 'package:flutter_thermal_printer/utils/printer.dart';
 
+import '../flutter_thermal_printer_platform_interface.dart';
+import '../utils/printer.dart';
+
+/// Optimized printer manager for non-Windows platforms
+/// Handles BLE and USB printer discovery and operations
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
 
@@ -18,40 +23,47 @@ class OtherPrinterManager {
     return _instance!;
   }
 
-  final StreamController<List<Printer>> _devicesstream =
+  final StreamController<List<Printer>> _devicesStream =
       StreamController<List<Printer>>.broadcast();
 
-  Stream<List<Printer>> get devicesStream => _devicesstream.stream;
-  StreamSubscription? subscription;
+  Stream<List<Printer>> get devicesStream => _devicesStream.stream;
 
-  static String channelName = 'flutter_thermal_printer/events';
-  EventChannel eventChannel = EventChannel(channelName);
-  bool get isIos => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+  StreamSubscription? _bleSubscription;
+  StreamSubscription? _usbSubscription;
 
-  // Stop scanning for BLE devices
+  static const String _channelName = 'flutter_thermal_printer/events';
+  final EventChannel _eventChannel = const EventChannel(_channelName);
+
+  bool get _isApplePlatform => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
+
+  final List<Printer> _devices = [];
+
+  /// Optimized stop scanning with better resource cleanup
   Future<void> stopScan({
     bool stopBle = true,
     bool stopUsb = true,
   }) async {
     try {
       if (stopBle) {
-        await subscription?.cancel();
+        await _bleSubscription?.cancel();
+        _bleSubscription = null;
         await FlutterBluePlus.stopScan();
       }
       if (stopUsb) {
         await _usbSubscription?.cancel();
+        _usbSubscription = null;
       }
     } catch (e) {
-      log('Failed to stop scanning for devices $e');
+      log('Failed to stop scanning for devices: $e');
     }
   }
 
   Future<bool> connect(Printer device) async {
     if (device.connectionType == ConnectionType.USB) {
-      return await FlutterThermalPrinterPlatform.instance.connect(device);
+      return FlutterThermalPrinterPlatform.instance.connect(device);
     } else {
       try {
-        bool isConnected = false;
+        var isConnected = false;
         final bt = BluetoothDevice.fromId(device.address!);
         await bt.connect();
         final stream = bt.connectionState.listen((event) {
@@ -70,7 +82,7 @@ class OtherPrinterManager {
 
   Future<bool> isConnected(Printer device) async {
     if (device.connectionType == ConnectionType.USB) {
-      return await FlutterThermalPrinterPlatform.instance.isConnected(device);
+      return FlutterThermalPrinterPlatform.instance.isConnected(device);
     } else {
       try {
         final bt = BluetoothDevice.fromId(device.address!);
@@ -106,7 +118,7 @@ class OtherPrinterManager {
           path: printer.address,
         );
       } catch (e) {
-        log("FlutterThermalPrinter: Unable to Print Data $e");
+        log('FlutterThermalPrinter: Unable to Print Data $e');
       }
     } else {
       try {
@@ -116,14 +128,15 @@ class OtherPrinterManager {
           return;
         }
 
-        final services = (await device.discoverServices()).skipWhile((value) =>
-            value.characteristics
-                .where((element) => element.properties.write)
-                .isEmpty);
+        final services = (await device.discoverServices()).skipWhile(
+          (value) => value.characteristics
+              .where((element) => element.properties.write)
+              .isEmpty,
+        );
 
         BluetoothCharacteristic? writeCharacteristic;
-        for (var service in services) {
-          for (var characteristic in service.characteristics) {
+        for (final service in services) {
+          for (final characteristic in service.characteristics) {
             if (characteristic.properties.write) {
               writeCharacteristic = characteristic;
               break;
@@ -145,7 +158,7 @@ class OtherPrinterManager {
 
           await writeCharacteristic.write(
             Uint8List.fromList(chunk),
-            withoutResponse: longData ? false : true,
+            withoutResponse: !longData,
             allowLongWrite: longData,
           );
         }
@@ -156,11 +169,6 @@ class OtherPrinterManager {
       }
     }
   }
-
-  StreamSubscription? refresher;
-
-  final List<Printer> _devices = [];
-  StreamSubscription? _usbSubscription;
 
   // Get Printers from BT and USB
   Future<void> getPrinters({
@@ -188,51 +196,59 @@ class OtherPrinterManager {
       final devices =
           await FlutterThermalPrinterPlatform.instance.startUsbScan();
 
-      List<Printer> usbPrinters = [];
-      for (var map in devices) {
+      final usbPrinters = <Printer>[];
+      for (final map in devices) {
+        final isConnected =
+            await FlutterThermalPrinterPlatform.instance.isConnected(
+          Printer(
+            vendorId: map['vendorId'].toString(),
+            productId: map['productId'].toString(),
+          ),
+        );
+
         final printer = Printer(
           vendorId: map['vendorId'].toString(),
           productId: map['productId'].toString(),
           name: map['name'],
           connectionType: ConnectionType.USB,
           address: map['vendorId'].toString(),
-          isConnected: map['connected'] ?? false,
+          isConnected: isConnected,
         );
-        printer.isConnected =
-            await FlutterThermalPrinterPlatform.instance.isConnected(printer);
         usbPrinters.add(printer);
       }
 
       _devices.addAll(usbPrinters);
-      _usbSubscription?.cancel();
-      _usbSubscription = eventChannel.receiveBroadcastStream().listen((event) {
+      await _usbSubscription?.cancel();
+      _usbSubscription = _eventChannel.receiveBroadcastStream().listen((event) {
         final map = Map<String, dynamic>.from(event);
-        _updateOrAddPrinter(Printer(
-          vendorId: map['vendorId'].toString(),
-          productId: map['productId'].toString(),
-          name: map['name'],
-          connectionType: ConnectionType.USB,
-          address: map['vendorId'].toString(),
-          isConnected: map['connected'] ?? false,
-        ));
+        _updateOrAddPrinter(
+          Printer(
+            vendorId: map['vendorId'].toString(),
+            productId: map['productId'].toString(),
+            name: map['name'],
+            connectionType: ConnectionType.USB,
+            address: map['vendorId'].toString(),
+            isConnected: map['connected'] ?? false,
+          ),
+        );
       });
 
       sortDevices();
     } catch (e) {
-      log("$e [USB Connection]");
+      log('$e [USB Connection]');
     }
   }
 
   Future<void> _getBLEPrinters(bool androidUsesFineLocation) async {
     try {
-      subscription?.cancel();
-      subscription = null;
-      if (isIos == false) {
+      await _bleSubscription?.cancel();
+      _bleSubscription = null;
+      if (!_isApplePlatform) {
         if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
           await FlutterBluePlus.turnOn();
         }
       } else {
-        BluetoothAdapterState state = await FlutterBluePlus.adapterState.first;
+        final state = await FlutterBluePlus.adapterState.first;
         if (state == BluetoothAdapterState.off) {
           log('Bluetooth is off, turning on.');
           return;
@@ -257,20 +273,20 @@ class OtherPrinterManager {
       sortDevices();
 
       // Listen to scan results
-      subscription = FlutterBluePlus.scanResults.listen((result) {
+      _bleSubscription = FlutterBluePlus.scanResults.listen((result) {
         final devices = result
-            .map((e) {
-              return Printer(
+            .map(
+              (e) => Printer(
                 address: e.device.remoteId.str,
                 name: e.device.platformName,
                 connectionType: ConnectionType.BLE,
                 isConnected: e.device.isConnected,
-              );
-            })
+              ),
+            )
             .where((device) => device.name?.isNotEmpty ?? false)
             .toList();
 
-        for (var device in devices) {
+        for (final device in devices) {
           _updateOrAddPrinter(device);
         }
       });
@@ -279,27 +295,29 @@ class OtherPrinterManager {
     }
   }
 
-  Future<List<Printer>> _getBLESystemDevices() async {
-    return (await FlutterBluePlus.systemDevices([]))
-        .map((device) => Printer(
+  Future<List<Printer>> _getBLESystemDevices() async =>
+      (await FlutterBluePlus.systemDevices([]))
+          .map(
+            (device) => Printer(
               address: device.remoteId.str,
               name: device.platformName,
               connectionType: ConnectionType.BLE,
               isConnected: device.isConnected,
-            ))
-        .toList();
-  }
+            ),
+          )
+          .toList();
 
-  Future<List<Printer>> _getBLEBondedDevices() async {
-    return (await FlutterBluePlus.bondedDevices)
-        .map((device) => Printer(
+  Future<List<Printer>> _getBLEBondedDevices() async =>
+      (await FlutterBluePlus.bondedDevices)
+          .map(
+            (device) => Printer(
               address: device.remoteId.str,
               name: device.platformName,
               connectionType: ConnectionType.BLE,
               isConnected: device.isConnected,
-            ))
-        .toList();
-  }
+            ),
+          )
+          .toList();
 
   void _updateOrAddPrinter(Printer printer) {
     final index =
@@ -316,9 +334,9 @@ class OtherPrinterManager {
     _devices
         .removeWhere((element) => element.name == null || element.name == '');
     // remove items having same vendorId
-    Set<String> seen = {};
+    final seen = <String>{};
     _devices.retainWhere((element) {
-      String uniqueKey = '${element.vendorId}_${element.address}';
+      final uniqueKey = '${element.vendorId}_${element.address}';
       if (seen.contains(uniqueKey)) {
         return false; // Remove duplicate
       } else {
@@ -326,18 +344,14 @@ class OtherPrinterManager {
         return true; // Keep
       }
     });
-    _devicesstream.add(_devices);
+    _devicesStream.add(_devices);
   }
 
   Future<void> turnOnBluetooth() async {
     await FlutterBluePlus.turnOn();
   }
 
-  Stream<bool> get isBleTurnedOnStream {
-    return FlutterBluePlus.adapterState.map(
-      (event) {
-        return event == BluetoothAdapterState.on;
-      },
-    );
-  }
+  Stream<bool> get isBleTurnedOnStream => FlutterBluePlus.adapterState.map(
+        (event) => event == BluetoothAdapterState.on,
+      );
 }

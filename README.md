@@ -1,9 +1,9 @@
 # flutter_thermal_printer
+
 <img src="https://res.cloudinary.com/daagzbhsu/image/upload/v1735536729/vxobf0gilq0pixfsnjw1.png" />
 
 ![Visits Badge](https://badges.pufler.dev/visits/SunilDevX/flutter_thermal_printer)
 
-Package for all services for thermal printer in Android, iOS, macOS, Windows.
 
 ## Buy Me A Coffee
 If you find this project helpful and want to support its development, you can buy me a coffee:
