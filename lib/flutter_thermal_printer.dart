@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -7,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
+import 'package:universal_ble/universal_ble.dart';
 
 import 'Others/other_printers_manager.dart';
 import 'Windows/window_printer_manager.dart';
@@ -16,6 +18,7 @@ export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 export 'package:flutter_blue_plus/flutter_blue_plus.dart'
     show BluetoothDevice, BluetoothConnectionState;
 export 'package:flutter_thermal_printer/network/network_printer.dart';
+export 'package:universal_ble/universal_ble.dart';
 
 /// Main class for thermal printer operations across all platforms
 ///
@@ -141,7 +144,8 @@ class FlutterThermalPrinter {
     if (Platform.isWindows) {
       return WindowPrinterManager.instance.isBleTurnedOn();
     } else {
-      return FlutterBluePlus.adapterStateNow == BluetoothAdapterState.on;
+      final state = await UniversalBle.getBluetoothAvailabilityState();
+      return state == AvailabilityState.poweredOn;
     }
   }
 
@@ -243,7 +247,7 @@ class FlutterThermalPrinter {
     BuildContext context, {
     required Printer printer,
     required Widget widget,
-    Duration delay = const Duration(milliseconds: 100),
+    Duration delay = const Duration(milliseconds: 10),
     PaperSize paperSize = PaperSize.mm80,
     CapabilityProfile? profile,
     bool printOnBle = false,
@@ -252,11 +256,14 @@ class FlutterThermalPrinter {
     final controller = ScreenshotController();
 
     try {
+      log('Date2: ${DateTime.now()}');
+
       final image = await controller.captureFromLongWidget(
         widget,
         pixelRatio: View.of(context).devicePixelRatio,
         delay: delay,
       );
+      log('Date2: ${DateTime.now()}');
 
       // Handle BLE printing with single raster approach
       if (printer.connectionType == ConnectionType.BLE) {
@@ -296,6 +303,7 @@ class FlutterThermalPrinter {
   ) async {
     final profile0 = profile ?? await CapabilityProfile.load();
     final ticket = Generator(paperSize, profile0);
+    log('Date3: ${DateTime.now()}');
 
     var imagebytes = img.decodeImage(image);
     if (imagebytes == null) {
@@ -306,6 +314,7 @@ class FlutterThermalPrinter {
     final raster = ticket.imageRaster(
       imagebytes,
     );
+    log('Date3: ${DateTime.now()}');
 
     await printData(printer, raster, longData: true);
   }

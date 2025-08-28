@@ -2,17 +2,13 @@
 
 import 'dart:async';
 import 'dart:developer';
-import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:universal_ble/universal_ble.dart';
 
 import '../flutter_thermal_printer_platform_interface.dart';
 import '../utils/printer.dart';
 
-/// Optimized printer manager for non-Windows platforms
-/// Handles BLE and USB printer discovery and operations
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
 
@@ -30,13 +26,23 @@ class OtherPrinterManager {
 
   StreamSubscription? _bleSubscription;
   StreamSubscription? _usbSubscription;
+  StreamSubscription? _bleAvailabilitySubscription;
 
   static const String _channelName = 'flutter_thermal_printer/events';
   final EventChannel _eventChannel = const EventChannel(_channelName);
 
-  bool get _isApplePlatform => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
-
   final List<Printer> _devices = [];
+
+  /// Initialize the manager and check BLE availability
+  Future<void> initialize() async {
+    try {
+      // Check BLE availability
+      final isAvailable = await UniversalBle.getBluetoothAvailabilityState();
+      log('Bluetooth availability: $isAvailable');
+    } catch (e) {
+      log('Failed to initialize printer manager: $e');
+    }
+  }
 
   /// Optimized stop scanning with better resource cleanup
   Future<void> stopScan({
@@ -47,7 +53,7 @@ class OtherPrinterManager {
       if (stopBle) {
         await _bleSubscription?.cancel();
         _bleSubscription = null;
-        await FlutterBluePlus.stopScan();
+        await UniversalBle.stopScan();
       }
       if (stopUsb) {
         await _usbSubscription?.cancel();
@@ -58,53 +64,82 @@ class OtherPrinterManager {
     }
   }
 
+  /// Dispose all resources
+  Future<void> dispose() async {
+    await stopScan();
+    await _bleAvailabilitySubscription?.cancel();
+    await _devicesStream.close();
+  }
+
+  StreamSubscription? connectionStreamSubscription;
+
+  /// Connect to a printer device
   Future<bool> connect(Printer device) async {
     if (device.connectionType == ConnectionType.USB) {
       return FlutterThermalPrinterPlatform.instance.connect(device);
-    } else {
+    } else if (device.connectionType == ConnectionType.BLE) {
       try {
-        var isConnected = false;
-        final bt = BluetoothDevice.fromId(device.address!);
-        await bt.connect();
-        final stream = bt.connectionState.listen((event) {
-          if (event == BluetoothConnectionState.connected) {
-            isConnected = true;
-          }
-        });
-        await Future.delayed(const Duration(seconds: 3));
-        await stream.cancel();
-        return isConnected;
+        final isConnected = Completer<bool>();
+        if (device.address == null) {
+          log('Device address is null');
+          return false;
+        }
+
+        await device.connect();
+        connectionStreamSubscription =
+            device.connectionStream.listen(isConnected.complete);
+        await Future.wait([
+          Future.delayed(const Duration(seconds: 10), () {
+            isConnected.complete(false);
+          }),
+          isConnected.future,
+        ]);
+        await connectionStreamSubscription?.cancel();
+        log('Connection status: ${await isConnected.future} for device ${device.name}');
+        return await isConnected.future;
       } catch (e) {
+        log('Failed to connect to BLE device: $e');
         return false;
       }
     }
+    return false;
   }
 
+  /// Check if a device is connected
   Future<bool> isConnected(Printer device) async {
     if (device.connectionType == ConnectionType.USB) {
       return FlutterThermalPrinterPlatform.instance.isConnected(device);
-    } else {
+    } else if (device.connectionType == ConnectionType.BLE) {
       try {
-        final bt = BluetoothDevice.fromId(device.address!);
-        return bt.isConnected;
+        if (device.address == null) {
+          return false;
+        }
+        return device.isConnected ?? false;
       } catch (e) {
+        log('Failed to check connection status: $e');
         return false;
       }
     }
+    return false;
   }
 
+  /// Disconnect from a printer device
   Future<void> disconnect(Printer device) async {
     if (device.connectionType == ConnectionType.BLE) {
       try {
-        final bt = BluetoothDevice.fromId(device.address!);
-        await bt.disconnect();
+        if (device.address != null) {
+          await device.disconnect();
+          log('Disconnected from device ${device.name}');
+        }
       } catch (e) {
-        log('Failed to disconnect device');
+        log('Failed to disconnect device: $e');
       }
     }
   }
 
-  // Print data to BLE device
+  List<Map<String, BleCharacteristic?>> characteristicList = [];
+
+  /// Print data to printer device
   Future<void> printData(
     Printer printer,
     List<int> bytes, {
@@ -120,26 +155,25 @@ class OtherPrinterManager {
       } catch (e) {
         log('FlutterThermalPrinter: Unable to Print Data $e');
       }
-    } else {
+    } else if (printer.connectionType == ConnectionType.BLE) {
       try {
-        final device = BluetoothDevice.fromId(printer.address!);
-        if (!device.isConnected) {
-          log('Device is not connected');
-          return;
-        }
-
-        final services = (await device.discoverServices()).skipWhile(
-          (value) => value.characteristics
-              .where((element) => element.properties.write)
-              .isEmpty,
+        BleCharacteristic? writeCharacteristic;
+        final hasCharacteristic = characteristicList.where(
+          (element) => element.containsKey(printer.address),
         );
+        if (hasCharacteristic.isNotEmpty) {
+          writeCharacteristic = hasCharacteristic.first[printer.address];
+        } else {
+          final services = await printer.discoverServices();
 
-        BluetoothCharacteristic? writeCharacteristic;
-        for (final service in services) {
-          for (final characteristic in service.characteristics) {
-            if (characteristic.properties.write) {
-              writeCharacteristic = characteristic;
-              break;
+          for (final service in services) {
+            for (final characteristic in service.characteristics) {
+              if (characteristic.properties.contains(
+                CharacteristicProperty.write,
+              )) {
+                writeCharacteristic = characteristic;
+                break;
+              }
             }
           }
         }
@@ -149,7 +183,7 @@ class OtherPrinterManager {
           return;
         }
 
-        const maxChunkSize = 512;
+        const maxChunkSize = 30;
         for (var i = 0; i < bytes.length; i += maxChunkSize) {
           final chunk = bytes.sublist(
             i,
@@ -158,11 +192,8 @@ class OtherPrinterManager {
 
           await writeCharacteristic.write(
             Uint8List.fromList(chunk),
-            withoutResponse: !longData,
-            allowLongWrite: longData,
           );
         }
-
         return;
       } catch (e) {
         log('Failed to print data to device $e');
@@ -170,7 +201,7 @@ class OtherPrinterManager {
     }
   }
 
-  // Get Printers from BT and USB
+  /// Get Printers from BT and USB
   Future<void> getPrinters({
     List<ConnectionType> connectionTypes = const [
       ConnectionType.BLE,
@@ -191,6 +222,7 @@ class OtherPrinterManager {
     }
   }
 
+  /// USB printer discovery
   Future<void> _getUSBPrinters() async {
     try {
       final devices =
@@ -239,86 +271,56 @@ class OtherPrinterManager {
     }
   }
 
+  /// Universal BLE scanner implementation
   Future<void> _getBLEPrinters(bool androidUsesFineLocation) async {
     try {
       await _bleSubscription?.cancel();
       _bleSubscription = null;
-      if (!_isApplePlatform) {
-        if (FlutterBluePlus.adapterStateNow != BluetoothAdapterState.on) {
-          await FlutterBluePlus.turnOn();
+
+      // Check bluetooth availability
+      final availability = await UniversalBle.getBluetoothAvailabilityState();
+      if (availability != AvailabilityState.poweredOn) {
+        log('Bluetooth is not powered on. Current state: $availability');
+        if (availability == AvailabilityState.poweredOff) {
+          throw Exception('Bluetooth is turned off. Please enable Bluetooth.');
         }
-      } else {
-        final state = await FlutterBluePlus.adapterState.first;
-        if (state == BluetoothAdapterState.off) {
-          log('Bluetooth is off, turning on.');
-          return;
-        }
+        return;
       }
 
-      await FlutterBluePlus.stopScan();
-      await FlutterBluePlus.startScan(
-        androidUsesFineLocation: androidUsesFineLocation,
-      );
+      // Stop any ongoing scan
+      await UniversalBle.stopScan();
 
-      // Get system devices
-      final systemDevices = await _getBLESystemDevices();
-      _devices.addAll(systemDevices);
-
-      // Get bonded devices (Android only)
-      if (Platform.isAndroid) {
-        final bondedDevices = await _getBLEBondedDevices();
-        _devices.addAll(bondedDevices);
-      }
+      // Start scanning
+      await UniversalBle.startScan();
+      log('Started BLE scan');
 
       sortDevices();
 
-      // Listen to scan results
-      _bleSubscription = FlutterBluePlus.scanResults.listen((result) {
-        final devices = result
-            .map(
-              (e) => Printer(
-                address: e.device.remoteId.str,
-                name: e.device.platformName,
+      // Listen to scan results using universal_ble
+      _bleSubscription = UniversalBle.scanStream.listen(
+        (scanResult) async {
+          if (scanResult.name?.isNotEmpty ?? false) {
+            _updateOrAddPrinter(
+              Printer(
+                address: scanResult.deviceId,
+                name: scanResult.name,
                 connectionType: ConnectionType.BLE,
-                isConnected: e.device.isConnected,
+                isConnected: await scanResult.isConnected,
               ),
-            )
-            .where((device) => device.name?.isNotEmpty ?? false)
-            .toList();
-
-        for (final device in devices) {
-          _updateOrAddPrinter(device);
-        }
-      });
+            );
+          }
+        },
+        onError: (error) {
+          log('BLE scan error: $error');
+        },
+      );
     } catch (e) {
+      log('Failed to start BLE scan: $e');
       rethrow;
     }
   }
 
-  Future<List<Printer>> _getBLESystemDevices() async =>
-      (await FlutterBluePlus.systemDevices([]))
-          .map(
-            (device) => Printer(
-              address: device.remoteId.str,
-              name: device.platformName,
-              connectionType: ConnectionType.BLE,
-              isConnected: device.isConnected,
-            ),
-          )
-          .toList();
-
-  Future<List<Printer>> _getBLEBondedDevices() async =>
-      (await FlutterBluePlus.bondedDevices)
-          .map(
-            (device) => Printer(
-              address: device.remoteId.str,
-              name: device.platformName,
-              connectionType: ConnectionType.BLE,
-              isConnected: device.isConnected,
-            ),
-          )
-          .toList();
-
+  /// Update or add printer to the devices list
   void _updateOrAddPrinter(Printer printer) {
     final index =
         _devices.indexWhere((device) => device.address == printer.address);
@@ -330,6 +332,7 @@ class OtherPrinterManager {
     sortDevices();
   }
 
+  /// Sort and filter devices
   void sortDevices() {
     _devices
         .removeWhere((element) => element.name == null || element.name == '');
@@ -347,11 +350,22 @@ class OtherPrinterManager {
     _devicesStream.add(_devices);
   }
 
+  /// Turn on Bluetooth (universal approach)
   Future<void> turnOnBluetooth() async {
-    await FlutterBluePlus.turnOn();
+    try {
+      final availability = await UniversalBle.getBluetoothAvailabilityState();
+      if (availability == AvailabilityState.poweredOff) {
+        await UniversalBle.enableBluetooth();
+      }
+    } catch (e) {
+      log('Failed to turn on Bluetooth: $e');
+    }
   }
 
-  Stream<bool> get isBleTurnedOnStream => FlutterBluePlus.adapterState.map(
-        (event) => event == BluetoothAdapterState.on,
-      );
+  /// Stream to monitor Bluetooth state
+  Stream<bool> get isBleTurnedOnStream =>
+      Stream.periodic(const Duration(seconds: 5), (_) async {
+        final state = await UniversalBle.getBluetoothAvailabilityState();
+        return state == AvailabilityState.poweredOn;
+      }).asyncMap((event) => event).distinct();
 }

@@ -1,15 +1,17 @@
 // ignore_for_file: constant_identifier_names
 
+import 'package:universal_ble/universal_ble.dart';
+
 /// Optimized printer model with better data validation and serialization
-class Printer {
-  const Printer({
+class Printer extends BleDevice {
+  Printer({
     this.address,
     this.name,
     this.connectionType,
     this.isConnected,
     this.vendorId,
     this.productId,
-  });
+  }) : super(deviceId: address ?? '', name: name ?? '');
 
   /// Create Printer from JSON with validation
   factory Printer.fromJson(Map<String, dynamic> json) {
@@ -27,8 +29,10 @@ class Printer {
       throw FormatException('Invalid Printer JSON format: $e');
     }
   }
-  final String? address;
+
+  @override
   final String? name;
+  final String? address;
   final ConnectionType? connectionType;
   final bool? isConnected;
   final String? vendorId;
