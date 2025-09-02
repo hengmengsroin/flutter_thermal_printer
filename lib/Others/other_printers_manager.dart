@@ -72,6 +72,7 @@ class OtherPrinterManager {
   }
 
   StreamSubscription? connectionStreamSubscription;
+  Timer? connectionTimeoutTimer;
 
   /// Connect to a printer device
   Future<bool> connect(Printer device) async {
@@ -87,16 +88,24 @@ class OtherPrinterManager {
 
         await device.connect();
         connectionStreamSubscription =
-            device.connectionStream.listen(isConnected.complete);
-        await Future.wait([
-          Future.delayed(const Duration(seconds: 10), () {
+            device.connectionStream.listen((connected) {
+          if (!isConnected.isCompleted) {
+            isConnected.complete(connected);
+          }
+        });
+
+        // Set up timeout
+        connectionTimeoutTimer = Timer(const Duration(seconds: 10), () {
+          if (!isConnected.isCompleted) {
             isConnected.complete(false);
-          }),
-          isConnected.future,
-        ]);
+          }
+        });
+
+        final result = await isConnected.future;
         await connectionStreamSubscription?.cancel();
-        log('Connection status: ${await isConnected.future} for device ${device.name}');
-        return await isConnected.future;
+        connectionTimeoutTimer?.cancel();
+        log('Connection status: $result for device ${device.name}');
+        return result;
       } catch (e) {
         log('Failed to connect to BLE device: $e');
         return false;
