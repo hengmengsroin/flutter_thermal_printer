@@ -1,22 +1,15 @@
 import 'dart:async';
-import 'dart:developer';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
-import 'package:universal_ble/universal_ble.dart';
 
-import 'Others/other_printers_manager.dart';
-import 'Windows/window_printer_manager.dart';
+import 'printer_manager.dart';
 import 'utils/printer.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
-export 'package:flutter_blue_plus/flutter_blue_plus.dart'
-    show BluetoothDevice, BluetoothConnectionState;
 export 'package:flutter_thermal_printer/network/network_printer.dart';
 export 'package:universal_ble/universal_ble.dart';
 
@@ -27,72 +20,56 @@ export 'package:universal_ble/universal_ble.dart';
 class FlutterThermalPrinter {
   FlutterThermalPrinter._();
 
+  // ==========================================================================
+  // STATIC VARIABLES AND INSTANCE
+  // ==========================================================================
+
   static FlutterThermalPrinter? _instance;
 
-  /// Singleton instance with improved initialization
+  // ignore: prefer_constructors_over_static_methods
   static FlutterThermalPrinter get instance {
-    if (_instance == null) {
-      _instance = FlutterThermalPrinter._();
-      _initializeLogLevel();
-    }
+    _instance ??= FlutterThermalPrinter._();
     return _instance!;
   }
 
-  /// Initialize log level for non-Windows platforms
-  static void _initializeLogLevel() {
-    if (!Platform.isWindows) {
-      try {
-        FlutterBluePlus.setLogLevel(LogLevel.debug);
-      } catch (e) {
-        // Silently handle log level initialization errors
-      }
-    }
-  }
+  // ==========================================================================
+  // STREAMS AND GETTERS
+  // ==========================================================================
 
-  Stream<List<Printer>> get devicesStream {
-    if (Platform.isWindows) {
-      return WindowPrinterManager.instance.devicesStream;
-    } else {
-      return OtherPrinterManager.instance.devicesStream;
-    }
-  }
+  /// Stream of available printers
+  Stream<List<Printer>> get devicesStream =>
+      PrinterManager.instance.devicesStream;
 
-  Future<bool> connect(Printer device) async {
-    if (Platform.isWindows) {
-      return WindowPrinterManager.instance.connect(device);
-    } else {
-      return OtherPrinterManager.instance.connect(device);
-    }
-  }
+  /// Stream to monitor Bluetooth state
+  Stream<bool> get isBleTurnedOnStream =>
+      PrinterManager.instance.isBleTurnedOnStream;
 
+  // ==========================================================================
+  // PUBLIC METHODS - CORE PRINTER OPERATIONS
+  // ==========================================================================
+
+  /// Connect to a printer device
+  Future<bool> connect(Printer device) async =>
+      PrinterManager.instance.connect(device);
+
+  /// Disconnect from a printer device
   Future<void> disconnect(Printer device) async {
-    if (Platform.isWindows) {
-      // await WindowBleManager.instance.disc(device);
-    } else {
-      await OtherPrinterManager.instance.disconnect(device);
-    }
+    await PrinterManager.instance.disconnect(device);
   }
 
+  /// Print raw data to printer
   Future<void> printData(
     Printer device,
     List<int> bytes, {
     bool longData = false,
-  }) async {
-    if (Platform.isWindows) {
-      return WindowPrinterManager.instance.printData(
+  }) async =>
+      PrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
       );
-    } else {
-      return OtherPrinterManager.instance.printData(
-        device,
-        bytes,
-        longData: longData,
-      );
-    }
-  }
 
+  /// Get available printers
   Future<void> getPrinters({
     Duration refreshDuration = const Duration(seconds: 2),
     List<ConnectionType> connectionTypes = const [
@@ -101,53 +78,29 @@ class FlutterThermalPrinter {
     ],
     bool androidUsesFineLocation = false,
   }) async {
-    if (Platform.isWindows) {
-      await WindowPrinterManager.instance.getPrinters(
-        refreshDuration: refreshDuration,
-        connectionTypes: connectionTypes,
-      );
-    } else {
-      await OtherPrinterManager.instance.getPrinters(
-        connectionTypes: connectionTypes,
-        androidUsesFineLocation: androidUsesFineLocation,
-      );
-    }
+    await PrinterManager.instance.getPrinters(
+      refreshDuration: refreshDuration,
+      connectionTypes: connectionTypes,
+      androidUsesFineLocation: androidUsesFineLocation,
+    );
   }
 
+  /// Stop scanning for printers
   Future<void> stopScan() async {
-    if (Platform.isWindows) {
-      await WindowPrinterManager.instance.stopscan();
-    } else {
-      await OtherPrinterManager.instance.stopScan();
-    }
+    await PrinterManager.instance.stopScan();
   }
 
-  // Turn On Bluetooth
+  /// Turn on Bluetooth
   Future<void> turnOnBluetooth() async {
-    if (Platform.isWindows) {
-      await WindowPrinterManager.instance.turnOnBluetooth();
-    } else {
-      await OtherPrinterManager.instance.turnOnBluetooth();
-    }
+    await PrinterManager.instance.turnOnBluetooth();
   }
 
-  Stream<bool> get isBleTurnedOnStream {
-    if (Platform.isWindows) {
-      return WindowPrinterManager.instance.isBleTurnedOnStream;
-    } else {
-      return OtherPrinterManager.instance.isBleTurnedOnStream;
-    }
-  }
+  /// Check if Bluetooth is turned on
+  Future<bool> isBleTurnedOn() async => PrinterManager.instance.isBleTurnedOn();
 
-  // Get BleState
-  Future<bool> isBleTurnedOn() async {
-    if (Platform.isWindows) {
-      return WindowPrinterManager.instance.isBleTurnedOn();
-    } else {
-      final state = await UniversalBle.getBluetoothAvailabilityState();
-      return state == AvailabilityState.poweredOn;
-    }
-  }
+  // ==========================================================================
+  // ADVANCED PRINTING METHODS
+  // ==========================================================================
 
   /// Optimized screen capture and conversion to printer-ready bytes
   Future<Uint8List> screenShotWidget(
@@ -191,6 +144,75 @@ class FlutterThermalPrinter {
       throw Exception('Failed to capture widget screenshot: $e');
     }
   }
+
+  /// Optimized widget printing with better resource management
+  Future<void> printWidget(
+    BuildContext context, {
+    required Printer printer,
+    required Widget widget,
+    Duration delay = const Duration(milliseconds: 10),
+    PaperSize paperSize = PaperSize.mm80,
+    CapabilityProfile? profile,
+    bool printOnBle = false,
+    bool cutAfterPrinted = true,
+  }) async {
+    final controller = ScreenshotController();
+
+    try {
+      final image = await controller.captureFromLongWidget(
+        widget,
+        pixelRatio: View.of(context).devicePixelRatio,
+        delay: delay,
+      );
+
+      // Handle other platforms with chunked approach
+      await _printChunkedWidget(
+        image,
+        printer,
+        paperSize,
+        profile,
+        cutAfterPrinted,
+      );
+    } catch (e) {
+      throw Exception('Failed to print widget: $e');
+    }
+  }
+
+  /// Optimized image bytes printing with validation and error handling
+  Future<void> printImageBytes({
+    required Uint8List imageBytes,
+    required Printer printer,
+    Duration delay = const Duration(milliseconds: 100),
+    PaperSize paperSize = PaperSize.mm80,
+    CapabilityProfile? profile,
+    Generator? generator,
+    bool printOnBle = false,
+    int? customWidth,
+  }) async {
+    // Validate BLE printing settings
+    if (!printOnBle && printer.connectionType == ConnectionType.BLE) {
+      throw Exception(
+        'Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true',
+      );
+    }
+
+    try {
+      await _printImageBytesOtherPlatforms(
+        imageBytes,
+        printer,
+        paperSize,
+        profile,
+        generator,
+        customWidth,
+      );
+    } catch (e) {
+      throw Exception('Failed to print image bytes: $e');
+    }
+  }
+
+  // ==========================================================================
+  // PRIVATE HELPER METHODS
+  // ==========================================================================
 
   /// Process image in optimized chunks for better memory management
   Uint8List _processImageInChunks(img.Image image, Generator generator) {
@@ -240,83 +262,6 @@ class FlutterThermalPrinter {
       return number;
     }
     return number + (8 - (number % 8));
-  }
-
-  /// Optimized widget printing with better resource management
-  Future<void> printWidget(
-    BuildContext context, {
-    required Printer printer,
-    required Widget widget,
-    Duration delay = const Duration(milliseconds: 10),
-    PaperSize paperSize = PaperSize.mm80,
-    CapabilityProfile? profile,
-    bool printOnBle = false,
-    bool cutAfterPrinted = true,
-  }) async {
-    final controller = ScreenshotController();
-
-    try {
-      log('Date2: ${DateTime.now()}');
-
-      final image = await controller.captureFromLongWidget(
-        widget,
-        pixelRatio: View.of(context).devicePixelRatio,
-        delay: delay,
-      );
-      log('Date2: ${DateTime.now()}');
-
-      // Handle BLE printing with single raster approach
-      if (printer.connectionType == ConnectionType.BLE) {
-        await _printBLEWidget(image, printer, paperSize, profile);
-        return;
-      }
-
-      // Handle Windows printing
-      if (Platform.isWindows) {
-        await printData(
-          printer,
-          image.toList(),
-          longData: true,
-        );
-        return;
-      }
-
-      // Handle other platforms with chunked approach
-      await _printChunkedWidget(
-        image,
-        printer,
-        paperSize,
-        profile,
-        cutAfterPrinted,
-      );
-    } catch (e) {
-      throw Exception('Failed to print widget: $e');
-    }
-  }
-
-  /// Print widget on BLE devices using single raster approach
-  Future<void> _printBLEWidget(
-    Uint8List image,
-    Printer printer,
-    PaperSize paperSize,
-    CapabilityProfile? profile,
-  ) async {
-    final profile0 = profile ?? await CapabilityProfile.load();
-    final ticket = Generator(paperSize, profile0);
-    log('Date3: ${DateTime.now()}');
-
-    var imagebytes = img.decodeImage(image);
-    if (imagebytes == null) {
-      throw Exception('Failed to decode image for BLE printing');
-    }
-
-    imagebytes = _buildImageRasterAvailable(imagebytes);
-    final raster = ticket.imageRaster(
-      imagebytes,
-    );
-    log('Date3: ${DateTime.now()}');
-
-    await printData(printer, raster, longData: true);
   }
 
   /// Print widget using chunked approach for better memory management
@@ -371,46 +316,7 @@ class FlutterThermalPrinter {
     }
   }
 
-  /// Optimized image bytes printing with validation and error handling
-  Future<void> printImageBytes({
-    required Uint8List imageBytes,
-    required Printer printer,
-    Duration delay = const Duration(milliseconds: 100),
-    PaperSize paperSize = PaperSize.mm80,
-    CapabilityProfile? profile,
-    Generator? generator,
-    bool printOnBle = false,
-    int? customWidth,
-  }) async {
-    // Validate BLE printing settings
-    if (!printOnBle && printer.connectionType == ConnectionType.BLE) {
-      throw Exception(
-        'Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true',
-      );
-    }
-
-    try {
-      // Handle Windows printing
-      if (Platform.isWindows) {
-        await printData(printer, imageBytes.toList(), longData: true);
-        return;
-      }
-
-      // Handle other platforms
-      await _printImageBytesOtherPlatforms(
-        imageBytes,
-        printer,
-        paperSize,
-        profile,
-        generator,
-        customWidth,
-      );
-    } catch (e) {
-      throw Exception('Failed to print image bytes: $e');
-    }
-  }
-
-  /// Print image bytes on non-Windows platforms
+  /// Print image bytes for other platforms with chunking
   Future<void> _printImageBytesOtherPlatforms(
     Uint8List imageBytes,
     Printer printer,
