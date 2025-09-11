@@ -98,18 +98,23 @@ class PrinterManager {
           log('Device address is null');
           return false;
         }
+        final isConnected =
+            (await UniversalBle.getConnectionState(device.address!) ==
+                BleConnectionState.connected);
+        if (isConnected) {
+          log('Device ${device.name} is already connected');
+          return true;
+        }
+
+        log('Connecting to BLE device ${device.name} at ${device.address}');
 
         // Connect using universal_ble for all platforms including Windows
         await device.connect();
 
         // Wait a moment to establish connection
-        await Future.delayed(const Duration(seconds: 2));
-
-        // Check connection status
-        final isConnected = device.isConnected;
-        log('Connection status: $isConnected for device ${device.name}');
-
-        return isConnected ?? false;
+        await Future.delayed(const Duration(seconds: 10));
+        return (await UniversalBle.getConnectionState(device.address!) ==
+            BleConnectionState.connected);
       } catch (e) {
         log('Failed to connect to BLE device: $e');
         return false;
@@ -202,13 +207,7 @@ class PrinterManager {
           return;
         }
 
-        // Use appropriate chunk size based on platform and longData parameter
-        var maxChunkSize = 30; // Default for most platforms
-
-        if (longData) {
-          // For long data, try to get MTU size if possible
-          maxChunkSize = 512; // Larger chunks for long data
-        }
+        const maxChunkSize = 23; // Default for most platforms
 
         for (var i = 0; i < bytes.length; i += maxChunkSize) {
           final chunk = bytes.sublist(
@@ -290,43 +289,70 @@ class PrinterManager {
 
         final usbPrinters = <Printer>[];
         for (final map in devices) {
-          final isConnected =
-              await FlutterThermalPrinterPlatform.instance.isConnected(
-            Printer(
-              vendorId: map['vendorId'].toString(),
-              productId: map['productId'].toString(),
-            ),
-          );
-
           final printer = Printer(
             vendorId: map['vendorId'].toString(),
             productId: map['productId'].toString(),
             name: map['name'],
             connectionType: ConnectionType.USB,
             address: map['vendorId'].toString(),
-            isConnected: isConnected,
+            isConnected: false,
           );
-          usbPrinters.add(printer);
+          final isConnected =
+              await FlutterThermalPrinterPlatform.instance.isConnected(
+            printer,
+          );
+          usbPrinters.add(printer.copyWith(isConnected: isConnected));
         }
 
         for (final printer in usbPrinters) {
           _updateOrAddPrinter(printer);
         }
-        await _usbSubscription?.cancel();
-        _usbSubscription =
-            _eventChannel.receiveBroadcastStream().listen((event) {
-          final map = Map<String, dynamic>.from(event);
-          _updateOrAddPrinter(
-            Printer(
-              vendorId: map['vendorId'].toString(),
-              productId: map['productId'].toString(),
-              name: map['name'],
-              connectionType: ConnectionType.USB,
-              address: map['vendorId'].toString(),
-              isConnected: map['connected'] ?? false,
-            ),
-          );
-        });
+        if (Platform.isAndroid) {
+          await _usbSubscription?.cancel();
+          _usbSubscription =
+              _eventChannel.receiveBroadcastStream().listen((event) {
+            final map = Map<String, dynamic>.from(event);
+            _updateOrAddPrinter(
+              Printer(
+                vendorId: map['vendorId'].toString(),
+                productId: map['productId'].toString(),
+                name: map['name'],
+                connectionType: ConnectionType.USB,
+                address: map['vendorId'].toString(),
+                isConnected: map['connected'] ?? false,
+              ),
+            );
+          });
+        } else {
+          await _usbSubscription?.cancel();
+          _usbSubscription =
+              Stream.periodic(refreshDuration, (x) => x).listen((event) async {
+            final devices =
+                await FlutterThermalPrinterPlatform.instance.startUsbScan();
+
+            final usbPrinters = <Printer>[];
+            for (final map in devices) {
+              final printer = Printer(
+                vendorId: map['vendorId'].toString(),
+                productId: map['productId'].toString(),
+                name: map['name'],
+                connectionType: ConnectionType.USB,
+                address: map['vendorId'].toString(),
+                isConnected: false,
+              );
+              final isConnected =
+                  await FlutterThermalPrinterPlatform.instance.isConnected(
+                printer,
+              );
+              usbPrinters.add(printer.copyWith(isConnected: isConnected));
+            }
+
+            for (final printer in usbPrinters) {
+              _updateOrAddPrinter(printer);
+            }
+            sortDevices();
+          });
+        }
 
         sortDevices();
       }
@@ -362,14 +388,17 @@ class PrinterManager {
 
       // Listen to scan results using universal_ble
       _bleSubscription = UniversalBle.scanStream.listen(
-        (scanResult) {
+        (scanResult) async {
           if (scanResult.name?.isNotEmpty ?? false) {
             _updateOrAddPrinter(
               Printer(
                 address: scanResult.deviceId,
                 name: scanResult.name,
                 connectionType: ConnectionType.BLE,
-                isConnected: false, // Will be checked when connecting
+                isConnected: await UniversalBle.getConnectionState(
+                      scanResult.deviceId,
+                    ) ==
+                    BleConnectionState.connected,
               ),
             );
           }

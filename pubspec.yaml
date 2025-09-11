@@ -12,12 +12,13 @@ dependencies:
   esc_pos_utils_plus: ^2.0.4
   ffi: ^2.1.4
   flutter:
-    sdk: flutter 
+    sdk: flutter
   image: ^4.5.4
   plugin_platform_interface: ^2.1.8
   screenshot: ^3.0.0
-  universal_ble: ^0.21.0
+  universal_ble: ^0.21.1
   win32: ^5.12.0
+  
 
 dev_dependencies:
   flutter_lints: ^4.0.0

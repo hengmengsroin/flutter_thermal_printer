@@ -3,7 +3,6 @@
 import 'dart:async';
 import 'dart:developer';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
@@ -34,16 +33,17 @@ class _MyAppState extends State<MyApp> {
   void startScan() async {
     _devicesStreamSubscription?.cancel();
     await _flutterThermalPrinterPlugin.getPrinters(connectionTypes: [
-      if (kReleaseMode) ConnectionType.USB,
+      ConnectionType.USB,
       ConnectionType.BLE,
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
         .listen((List<Printer> event) {
       setState(() {
         printers = event;
-        printers.removeWhere(
-            (element) => element.name == null || element.name == '');
-        // log(printers.map((e) => e.name).toList().toString());
+        printers.removeWhere((element) =>
+            element.name == null ||
+            element.name == '' ||
+            element.name!.toLowerCase().contains("print") == false);
       });
     });
   }

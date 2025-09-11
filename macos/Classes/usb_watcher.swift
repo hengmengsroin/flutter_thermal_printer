@@ -57,6 +57,46 @@ public struct USBDevice {
         return dict
     }
 }
+
+// MARK: - PrinterDevice struct with same format as USBDevice
+public struct PrinterDevice {
+    public let id:UInt64
+    public let vendorId:UInt16
+    public let productId:UInt16
+    public let name:String
+    public let locationId:UInt32
+    public let vendorName:String?
+    public let serialNr:String?
+    
+    public init(id:UInt64,
+                vendorId:UInt16,
+                productId:UInt16,
+                name:String,
+                locationId:UInt32,
+                vendorName:String?,
+                serialNr:String? ) {
+        self.id = id
+        self.vendorId = vendorId
+        self.productId = productId
+        self.name = name
+        self.locationId = locationId
+        self.vendorName = vendorName
+        self.serialNr = serialNr
+        
+    }
+    // TO Dictionary - same format as USBDevice for compatibility
+    public func toDictionary() -> Dictionary<String, Any> {
+        var dict = Dictionary<String, Any>()
+        dict["id"] = self.id
+        dict["vendorId"] = self.vendorId
+        dict["productId"] = self.productId
+        dict["name"] = self.name
+        dict["locationId"] = self.locationId
+        dict["vendorName"] = self.vendorName
+        dict["serialNr"] = self.serialNr 
+        return dict
+    }
+}
 //
 //public protocol USBWatcherDelegate: AnyObject {
 //    /// Called on the main thread when a device is connected.

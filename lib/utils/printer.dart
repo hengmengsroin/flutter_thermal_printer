@@ -18,7 +18,7 @@ class Printer extends BleDevice {
     try {
       return Printer(
         address: json['address'] as String?,
-        name: _extractName(json),
+        name: json['name'] as String?,
         connectionType:
             _getConnectionTypeFromString(json['connectionType'] as String?),
         isConnected: json['isConnected'] as bool?,
@@ -38,27 +38,12 @@ class Printer extends BleDevice {
   final String? vendorId;
   final String? productId;
 
-  /// Extract name based on connection type
-  static String? _extractName(Map<String, dynamic> json) {
-    final connectionType = json['connectionType'] as String?;
-    if (connectionType == 'BLE') {
-      return json['platformName'] as String?;
-    }
-    return json['name'] as String?;
-  }
-
   /// Convert to JSON with proper formatting
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
 
     data['address'] = address;
-
-    if (connectionType == ConnectionType.BLE) {
-      data['platformName'] = name;
-    } else {
-      data['name'] = name;
-    }
-
+    data['name'] = name;
     data['connectionType'] = connectionType?.name;
     data['isConnected'] = isConnected;
     data['vendorId'] = vendorId;

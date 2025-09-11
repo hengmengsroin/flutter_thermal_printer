@@ -5,12 +5,10 @@
 import FlutterMacOS
 import Foundation
 
-import flutter_blue_plus_darwin
 import flutter_thermal_printer
 import universal_ble
 
 func RegisterGeneratedPlugins(registry: FlutterPluginRegistry) {
-  FlutterBluePlusPlugin.register(with: registry.registrar(forPlugin: "FlutterBluePlusPlugin"))
   FlutterThermalPrinterPlugin.register(with: registry.registrar(forPlugin: "FlutterThermalPrinterPlugin"))
   UniversalBlePlugin.register(with: registry.registrar(forPlugin: "UniversalBlePlugin"))
 }

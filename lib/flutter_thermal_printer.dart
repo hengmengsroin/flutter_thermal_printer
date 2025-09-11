@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
@@ -178,44 +179,14 @@ class FlutterThermalPrinter {
     }
   }
 
-  /// Optimized image bytes printing with validation and error handling
-  Future<void> printImageBytes({
-    required Uint8List imageBytes,
-    required Printer printer,
-    Duration delay = const Duration(milliseconds: 100),
-    PaperSize paperSize = PaperSize.mm80,
-    CapabilityProfile? profile,
-    Generator? generator,
-    bool printOnBle = false,
-    int? customWidth,
-  }) async {
-    // Validate BLE printing settings
-    if (!printOnBle && printer.connectionType == ConnectionType.BLE) {
-      throw Exception(
-        'Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true',
-      );
-    }
-
-    try {
-      await _printImageBytesOtherPlatforms(
-        imageBytes,
-        printer,
-        paperSize,
-        profile,
-        generator,
-        customWidth,
-      );
-    } catch (e) {
-      throw Exception('Failed to print image bytes: $e');
-    }
-  }
-
   // ==========================================================================
   // PRIVATE HELPER METHODS
   // ==========================================================================
 
   /// Process image in optimized chunks for better memory management
+  /// Skip chunking for macOS platform
   Uint8List _processImageInChunks(img.Image image, Generator generator) {
+    // For other platforms, use chunked approach
     const chunkHeight = 30;
     final totalHeight = image.height;
     final totalWidth = image.width;
@@ -265,6 +236,7 @@ class FlutterThermalPrinter {
   }
 
   /// Print widget using chunked approach for better memory management
+  /// Skip chunking for macOS platform
   Future<void> _printChunkedWidget(
     Uint8List image,
     Printer printer,
@@ -282,91 +254,46 @@ class FlutterThermalPrinter {
 
     imagebytes = _buildImageRasterAvailable(imagebytes);
 
-    const chunkHeight = 30;
-    final totalHeight = imagebytes.height;
-    final totalWidth = imagebytes.width;
-    final chunksCount = (totalHeight / chunkHeight).ceil();
-
-    // Print image in chunks
-    for (var i = 0; i < chunksCount; i++) {
-      final startY = i * chunkHeight;
-      final endY = (startY + chunkHeight > totalHeight)
-          ? totalHeight
-          : startY + chunkHeight;
-      final actualHeight = endY - startY;
-
-      final croppedImage = img.copyCrop(
-        imagebytes,
-        x: 0,
-        y: startY,
-        width: totalWidth,
-        height: actualHeight,
-      );
-
-      final raster = ticket.imageRaster(
-        croppedImage,
-      );
-
+    // For macOS, don't use chunking - send the entire image at once
+    if (Platform.isMacOS && printer.connectionType == ConnectionType.USB) {
+      List<int> raster;
+      raster = ticket.imageRaster(imagebytes);
+      if (cutAfterPrinted) {
+        raster += ticket.cut();
+      }
       await printData(printer, raster, longData: true);
-    }
+    } else {
+      // For other platforms, use chunked approach
+      const chunkHeight = 30;
+      final totalHeight = imagebytes.height;
+      final totalWidth = imagebytes.width;
+      final chunksCount = (totalHeight / chunkHeight).ceil();
 
-    // Add cut command if requested
-    if (cutAfterPrinted) {
-      await printData(printer, ticket.cut(), longData: true);
-    }
-  }
+      // Print image in chunks
+      for (var i = 0; i < chunksCount; i++) {
+        final startY = i * chunkHeight;
+        final endY = (startY + chunkHeight > totalHeight)
+            ? totalHeight
+            : startY + chunkHeight;
+        final actualHeight = endY - startY;
 
-  /// Print image bytes for other platforms with chunking
-  Future<void> _printImageBytesOtherPlatforms(
-    Uint8List imageBytes,
-    Printer printer,
-    PaperSize paperSize,
-    CapabilityProfile? profile,
-    Generator? generator,
-    int? customWidth,
-  ) async {
-    final profile0 = profile ?? await CapabilityProfile.load();
-    final ticket = generator ?? Generator(paperSize, profile0);
+        final croppedImage = img.copyCrop(
+          imagebytes,
+          x: 0,
+          y: startY,
+          width: totalWidth,
+          height: actualHeight,
+        );
 
-    var imagebytes = img.decodeImage(imageBytes);
-    if (imagebytes == null) {
-      throw Exception('Failed to decode image bytes');
-    }
+        final raster = ticket.imageRaster(
+          croppedImage,
+        );
 
-    // Apply custom width if specified
-    if (customWidth != null) {
-      final width = _makeDivisibleBy8(customWidth);
-      imagebytes = img.copyResize(imagebytes, width: width);
-    }
-
-    imagebytes = _buildImageRasterAvailable(imagebytes);
-
-    const chunkHeight = 30;
-    final totalHeight = imagebytes.height;
-    final totalWidth = imagebytes.width;
-    final chunksCount = (totalHeight / chunkHeight).ceil();
-
-    // Print in optimized chunks
-    for (var i = 0; i < chunksCount; i++) {
-      final startY = i * chunkHeight;
-      final endY = (startY + chunkHeight > totalHeight)
-          ? totalHeight
-          : startY + chunkHeight;
-      final actualHeight = endY - startY;
-
-      final croppedImage = img.copyCrop(
-        imagebytes,
-        x: 0,
-        y: startY,
-        width: totalWidth,
-        height: actualHeight,
-      );
-
-      final raster = ticket.imageRaster(
-        croppedImage,
-      );
-
-      await printData(printer, raster, longData: true);
+        await printData(printer, raster, longData: true);
+      }
+      if (cutAfterPrinted) {
+        await printData(printer, ticket.cut(), longData: true);
+      }
     }
   }
 }
