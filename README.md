@@ -14,6 +14,17 @@ If you find this project helpful and want to support its development, you can bu
 
 This plugin is used to print data on thermal printers with ease across multiple platforms.
 
+## 🎉 New Feature: USB Printing Services
+
+> **✨ Exciting Update!** We now support **USB printing services** across multiple platforms! Connect your thermal printers directly via USB for faster, more reliable printing without the need for wireless connections.
+> 
+> **Supported Platforms for USB:**
+> - 🤖 **Android** - Full USB support
+> - 🖥️ **Windows** - Complete USB integration  
+> - 🍎 **macOS** - Native USB connectivity
+> 
+> Experience enhanced printing performance with direct USB connections!
+
 ## Currently Supported
 
 | Service                        | Android | iOS | macOS | Windows |
@@ -39,7 +50,7 @@ getPrinters(
   refreshDuration: Duration,
   connectionTypes: List<ConnectionType>,
 ) {
-  // Supports WINDOWS, ANDROID for USB
+  // Supports WINDOWS, ANDROID , Macos for USB
   // MAC, IOS, ANDROID, WINDOWS for BLUETOOTH.
 }
 
@@ -66,10 +77,10 @@ getPrinters(
 | Feature                        | Android | iOS | macOS | Windows |
 | ------------------------------ | :-----: | :-: | :---: | :-----: |
 | Start scanning                 | ✅      |     | ✅    | ✅      |
-| Stop scanning                  | ✅      |     |       | ✅      |
-| Connect printer                | ✅      |     |       | ✅      |
-| Print data                     | ✅      |     |       | ✅      |
-| Print widget                   | ✅      |     |       | ✅      |
+| Stop scanning                  | ✅      |     | ✅    | ✅      |
+| Connect printer                | ✅      |     | ✅    | ✅      |
+| Print data                     | ✅      |     | ✅    | ✅      |
+| Print widget                   | ✅      |     | ✅    | ✅      |
 
 ---
 
@@ -115,8 +126,8 @@ Provides real-time monitoring for Bluetooth states, ensuring proactive error han
 
 ## Notes and Recommendations
 
-- **Windows Users:** Make sure you have the POS-X driver installed on Windows for printer compatibility.  
-  Download the driver from [POS-X Drivers](https://pos-x.com/downloads/driver/).
+- **Windows & MacOS Users:** Make sure you have the XPrinter driver installed on Windows for printer compatibility.  
+  Download the driver from [XPrinter Driver](https://www.xprintertech.com/drivers-2.html).
 
 - **Cross-Platform Usage:** Ensure Bluetooth permissions and configurations are set correctly for Android and iOS.
 
