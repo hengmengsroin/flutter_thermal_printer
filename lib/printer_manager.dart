@@ -166,6 +166,7 @@ class PrinterManager {
     Printer printer,
     List<int> bytes, {
     bool longData = false,
+    int? chunkSize,
   }) async {
     if (printer.connectionType == ConnectionType.USB) {
       if (Platform.isWindows) {
@@ -206,8 +207,11 @@ class PrinterManager {
           log('No write characteristic found');
           return;
         }
-
-        const maxChunkSize = 23; // Default for most platforms
+        final mtu = chunkSize ??
+            (Platform.isWindows
+                ? 50
+                : await printer.requestMtu(Platform.isMacOS ? 150 : 500));
+        final maxChunkSize = mtu - 3;
 
         for (var i = 0; i < bytes.length; i += maxChunkSize) {
           final chunk = bytes.sublist(
