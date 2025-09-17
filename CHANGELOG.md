@@ -1,3 +1,6 @@
+## 1.2.3+1
+* Updated BLE MTU query or pass custom chunksize
+
 ## 1.2.3
 * Added Full Support for USB on Macos
 * Changed Flutter_blue_plus to universal_ble for better support of BLE and Classic Devices

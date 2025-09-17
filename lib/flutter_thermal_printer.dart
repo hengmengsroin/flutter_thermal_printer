@@ -63,11 +63,13 @@ class FlutterThermalPrinter {
     Printer device,
     List<int> bytes, {
     bool longData = false,
+    int? chunkSize,
   }) async =>
       PrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
+        chunkSize: chunkSize,
       );
 
   /// Get available printers
@@ -156,6 +158,7 @@ class FlutterThermalPrinter {
     CapabilityProfile? profile,
     bool printOnBle = false,
     bool cutAfterPrinted = true,
+    int? chunkSize,
   }) async {
     final controller = ScreenshotController();
 
@@ -173,6 +176,7 @@ class FlutterThermalPrinter {
         paperSize,
         profile,
         cutAfterPrinted,
+        chunkSize: chunkSize,
       );
     } catch (e) {
       throw Exception('Failed to print widget: $e');
@@ -242,8 +246,9 @@ class FlutterThermalPrinter {
     Printer printer,
     PaperSize paperSize,
     CapabilityProfile? profile,
-    bool cutAfterPrinted,
-  ) async {
+    bool cutAfterPrinted, {
+    int? chunkSize,
+  }) async {
     final profile0 = profile ?? await CapabilityProfile.load();
     final ticket = Generator(paperSize, profile0);
 
@@ -261,7 +266,12 @@ class FlutterThermalPrinter {
       if (cutAfterPrinted) {
         raster += ticket.cut();
       }
-      await printData(printer, raster, longData: true);
+      await printData(
+        printer,
+        raster,
+        longData: true,
+        chunkSize: chunkSize,
+      );
     } else {
       // For other platforms, use chunked approach
       const chunkHeight = 30;
@@ -292,7 +302,12 @@ class FlutterThermalPrinter {
         await printData(printer, raster, longData: true);
       }
       if (cutAfterPrinted) {
-        await printData(printer, ticket.cut(), longData: true);
+        await printData(
+          printer,
+          ticket.cut(),
+          longData: true,
+          chunkSize: chunkSize,
+        );
       }
     }
   }
