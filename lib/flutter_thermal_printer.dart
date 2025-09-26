@@ -259,8 +259,8 @@ class FlutterThermalPrinter {
 
     imagebytes = _buildImageRasterAvailable(imagebytes);
 
-    // For macOS, don't use chunking - send the entire image at once
-    if (Platform.isMacOS && printer.connectionType == ConnectionType.USB) {
+    if ((Platform.isMacOS || Platform.isWindows) &&
+        printer.connectionType == ConnectionType.USB) {
       List<int> raster;
       raster = ticket.imageRaster(imagebytes);
       if (cutAfterPrinted) {
@@ -278,7 +278,7 @@ class FlutterThermalPrinter {
       final totalHeight = imagebytes.height;
       final totalWidth = imagebytes.width;
       final chunksCount = (totalHeight / chunkHeight).ceil();
-
+      var raster = <int>[];
       // Print image in chunks
       for (var i = 0; i < chunksCount; i++) {
         final startY = i * chunkHeight;
@@ -295,12 +295,12 @@ class FlutterThermalPrinter {
           height: actualHeight,
         );
 
-        final raster = ticket.imageRaster(
+        raster += ticket.imageRaster(
           croppedImage,
         );
-
-        await printData(printer, raster, longData: true);
       }
+      await printData(printer, raster, longData: true, chunkSize: chunkSize);
+
       if (cutAfterPrinted) {
         await printData(
           printer,
