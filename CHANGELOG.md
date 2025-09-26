@@ -1,3 +1,6 @@
+## 1.2.3+2
+* For windows and macos no chunking is required
+
 ## 1.2.3+1
 * Updated BLE MTU query or pass custom chunksize
 
