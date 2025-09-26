@@ -1,4 +1,4 @@
-## 1.2.3+2
+## 1.2.4
 * For windows and macos no chunking is required
 
 ## 1.2.3+1
