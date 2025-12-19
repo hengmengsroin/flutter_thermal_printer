@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/printer_manager.dart';
+import 'package:flutter_thermal_printer/utils/ble_config.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 
 import '../mocks/mock_platform.dart';
@@ -164,6 +165,58 @@ void main() {
 
       test('can stop only USB', () async {
         await PrinterManager.instance.stopScan(stopBle: false);
+      });
+    });
+
+    group('bleConfig', () {
+      test('has default config with 10 second delay', () {
+        final config = PrinterManager.instance.bleConfig;
+        expect(
+          config.connectionStabilizationDelay,
+          const Duration(seconds: 10),
+        );
+      });
+
+      test('bleConfig setter updates the configuration', () {
+        final originalConfig = PrinterManager.instance.bleConfig;
+
+        PrinterManager.instance.bleConfig =
+            const BleConfig(connectionStabilizationDelay: Duration(seconds: 3));
+
+        final newConfig = PrinterManager.instance.bleConfig;
+        expect(
+          newConfig.connectionStabilizationDelay,
+          const Duration(seconds: 3),
+        );
+
+        PrinterManager.instance.bleConfig = originalConfig;
+      });
+
+      test('bleConfig getter returns current config', () {
+        final config1 = PrinterManager.instance.bleConfig;
+        final config2 = PrinterManager.instance.bleConfig;
+        expect(
+          config1.connectionStabilizationDelay,
+          config2.connectionStabilizationDelay,
+        );
+      });
+
+      test('config changes persist across accesses', () {
+        final originalConfig = PrinterManager.instance.bleConfig;
+
+        PrinterManager.instance.bleConfig =
+            const BleConfig(connectionStabilizationDelay: Duration(seconds: 7));
+
+        expect(
+          PrinterManager.instance.bleConfig.connectionStabilizationDelay,
+          const Duration(seconds: 7),
+        );
+        expect(
+          PrinterManager.instance.bleConfig.connectionStabilizationDelay,
+          const Duration(seconds: 7),
+        );
+
+        PrinterManager.instance.bleConfig = originalConfig;
       });
     });
   });

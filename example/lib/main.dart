@@ -52,6 +52,9 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      _flutterThermalPrinterPlugin.bleConfig = const BleConfig(
+        connectionStabilizationDelay: Duration(seconds: 3),
+      );
       startScan();
     });
   }
