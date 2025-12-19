@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_method_channel.dart';
@@ -10,16 +8,16 @@ void main() {
 
   group('MethodChannelFlutterThermalPrinter', () {
     late MethodChannelFlutterThermalPrinter platform;
-    const MethodChannel channel = MethodChannel('flutter_thermal_printer');
+    const channel = MethodChannel('flutter_thermal_printer');
 
-    final List<MethodCall> log = [];
+    final log = <MethodCall>[];
 
     setUp(() {
       platform = MethodChannelFlutterThermalPrinter();
       log.clear();
 
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+          .setMockMethodCallHandler(channel, (methodCall) async {
         log.add(methodCall);
 
         switch (methodCall.method) {
@@ -239,4 +237,3 @@ void main() {
     });
   });
 }
-

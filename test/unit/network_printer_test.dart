@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:flutter_thermal_printer/network/network_printer.dart';
 import 'package:flutter_thermal_printer/network/network_print_result.dart';
+import 'package:flutter_thermal_printer/network/network_printer.dart';
 
 void main() {
   group('FlutterThermalPrinterNetwork', () {

@@ -85,4 +85,3 @@ class MockFlutterThermalPrinterPlatform extends FlutterThermalPrinterPlatform
     methodCalls.add('getPrinters');
   }
 }
-

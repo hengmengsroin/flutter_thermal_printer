@@ -6,9 +6,9 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:universal_ble/universal_ble.dart';
+
 import 'Windows/windows_platform.dart'
     if (dart.library.html) 'Windows/windows_stub.dart';
-
 import 'flutter_thermal_printer_platform_interface.dart';
 import 'utils/printer.dart';
 
@@ -82,7 +82,10 @@ class PrinterManager {
   }
 
   /// Connect to a printer device
-  Future<bool> connect(Printer device) async {
+  Future<bool> connect(
+    Printer device, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     if (device.connectionType == ConnectionType.USB) {
       if (Platform.isWindows) {
         // Windows USB connection - device is already available, no connection needed
@@ -96,6 +99,7 @@ class PrinterManager {
           log('Device address is null');
           return false;
         }
+
         final isConnected =
             (await UniversalBle.getConnectionState(device.address!) ==
                 BleConnectionState.connected);
@@ -103,16 +107,37 @@ class PrinterManager {
           log('Device ${device.name} is already connected');
           return true;
         }
-
+        final connectionCompleter = Completer<bool>();
         log('Connecting to BLE device ${device.name} at ${device.address}');
 
-        // Connect using universal_ble for all platforms including Windows
-        await device.connect();
+        StreamSubscription? subscription;
 
-        // Wait a moment to establish connection
-        await Future.delayed(const Duration(seconds: 10));
-        return (await UniversalBle.getConnectionState(device.address!) ==
-            BleConnectionState.connected);
+        try {
+          // Listen to global connection changes
+          subscription = device.connectionStream.listen((state) {
+            log('Connection state changed for device ${device.name}: $state');
+            if (state) {
+              if (!connectionCompleter.isCompleted) {
+                connectionCompleter.complete(true);
+              }
+            }
+          });
+
+          await device.connect();
+
+          return await connectionCompleter.future.timeout(
+            timeout,
+            onTimeout: () {
+              log('Connection to device ${device.name} timed out');
+              return false;
+            },
+          );
+        } catch (e) {
+          log('Error connecting to device: $e');
+          return false;
+        } finally {
+          await subscription?.cancel();
+        }
       } catch (e) {
         log('Failed to connect to BLE device: $e');
         return false;

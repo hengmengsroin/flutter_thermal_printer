@@ -89,7 +89,6 @@ void main() {
       test('returns false for BLE device with null address', () async {
         final printer = Printer(
           connectionType: ConnectionType.BLE,
-          address: null,
         );
 
         final result = await PrinterManager.instance.connect(printer);
@@ -97,7 +96,7 @@ void main() {
       });
 
       test('returns false for unknown connection type', () async {
-        final printer = Printer(connectionType: null);
+        final printer = Printer();
 
         final result = await PrinterManager.instance.connect(printer);
         expect(result, false);
@@ -108,7 +107,6 @@ void main() {
       test('returns false for BLE device with null address', () async {
         final printer = Printer(
           connectionType: ConnectionType.BLE,
-          address: null,
         );
 
         final result = await PrinterManager.instance.isConnected(printer);
@@ -116,7 +114,7 @@ void main() {
       });
 
       test('returns false for unknown connection type', () async {
-        final printer = Printer(connectionType: null);
+        final printer = Printer();
 
         final result = await PrinterManager.instance.isConnected(printer);
         expect(result, false);
@@ -127,7 +125,6 @@ void main() {
       test('handles BLE device with null address gracefully', () async {
         final printer = Printer(
           connectionType: ConnectionType.BLE,
-          address: null,
         );
 
         await PrinterManager.instance.disconnect(printer);
@@ -144,7 +141,7 @@ void main() {
       });
 
       test('does nothing for unknown connection type', () async {
-        final printer = Printer(connectionType: null);
+        final printer = Printer();
 
         await PrinterManager.instance.disconnect(printer);
       });
@@ -171,4 +168,3 @@ void main() {
     });
   });
 }
-

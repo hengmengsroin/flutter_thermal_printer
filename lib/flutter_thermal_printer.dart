@@ -50,8 +50,11 @@ class FlutterThermalPrinter {
   // ==========================================================================
 
   /// Connect to a printer device
-  Future<bool> connect(Printer device) async =>
-      PrinterManager.instance.connect(device);
+  Future<bool> connect(
+    Printer device, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async =>
+      PrinterManager.instance.connect(device, timeout: timeout);
 
   /// Disconnect from a printer device
   Future<void> disconnect(Printer device) async {

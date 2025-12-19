@@ -6,8 +6,7 @@ import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interfa
 import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
-class MockFlutterThermalPrinterPlatform
-    extends FlutterThermalPrinterPlatform
+class MockFlutterThermalPrinterPlatform extends FlutterThermalPrinterPlatform
     with MockPlatformInterfaceMixin {
   @override
   Future<String?> getPlatformVersion() async => 'Mock Platform';
@@ -43,7 +42,8 @@ void main() {
       expect(FlutterThermalPrinterPlatform.instance, mockPlatform);
     });
 
-    test('InvalidPlatform can be created but lacks MockPlatformInterfaceMixin', () {
+    test('InvalidPlatform can be created but lacks MockPlatformInterfaceMixin',
+        () {
       final invalidPlatform = InvalidPlatform();
       expect(invalidPlatform, isA<FlutterThermalPrinterPlatform>());
     });
@@ -122,7 +122,7 @@ void main() {
       test('throws UnimplementedError by default', () {
         final basePlatform = _BasePlatformForTest();
         expect(
-          () => basePlatform.getPlatformVersion(),
+          basePlatform.getPlatformVersion,
           throwsA(isA<UnimplementedError>()),
         );
       });
@@ -132,4 +132,3 @@ void main() {
 
 class _BasePlatformForTest extends FlutterThermalPrinterPlatform
     with MockPlatformInterfaceMixin {}
-

@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_method_channel.dart';
@@ -20,7 +22,7 @@ class MockFlutterThermalPrinterPlatform
   @override
   Future<void> printText(
     Printer device,
-    dynamic data, {
+    Uint8List data, {
     String? path,
   }) async {}
 
@@ -28,7 +30,7 @@ class MockFlutterThermalPrinterPlatform
   Future<bool> isConnected(Printer device) async => false;
 
   @override
-  Future<dynamic> convertImageToGrayscale(dynamic value) async => value;
+  Future<dynamic> convertImageToGrayscale(Uint8List? value) async => value;
 
   @override
   Future<bool> disconnect(Printer device) async => true;
@@ -41,8 +43,7 @@ class MockFlutterThermalPrinterPlatform
 }
 
 void main() {
-  final FlutterThermalPrinterPlatform initialPlatform =
-      FlutterThermalPrinterPlatform.instance;
+  final initialPlatform = FlutterThermalPrinterPlatform.instance;
 
   group('FlutterThermalPrinterPlatform', () {
     test('MethodChannelFlutterThermalPrinter is the default instance', () {

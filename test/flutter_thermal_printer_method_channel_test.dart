@@ -5,20 +5,20 @@ import 'package:flutter_thermal_printer/flutter_thermal_printer_method_channel.d
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  MethodChannelFlutterThermalPrinter platform = MethodChannelFlutterThermalPrinter();
-  const MethodChannel channel = MethodChannel('flutter_thermal_printer');
+  final platform = MethodChannelFlutterThermalPrinter();
+  const channel = MethodChannel('flutter_thermal_printer');
 
   setUp(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
       channel,
-      (MethodCall methodCall) async {
-        return '42';
-      },
+      (methodCall) async => '42',
     );
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger.setMockMethodCallHandler(channel, null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(channel, null);
   });
 
   test('getPlatformVersion', () async {
