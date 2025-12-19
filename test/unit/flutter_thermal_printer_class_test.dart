@@ -103,6 +103,40 @@ void main() {
         );
       });
     });
+
+    group('bleConfig', () {
+      test('has default config with 10 second delay', () {
+        final config = FlutterThermalPrinter.instance.bleConfig;
+        expect(
+          config.connectionStabilizationDelay,
+          const Duration(seconds: 10),
+        );
+      });
+
+      test('bleConfig setter updates the configuration', () {
+        final originalConfig = FlutterThermalPrinter.instance.bleConfig;
+
+        FlutterThermalPrinter.instance.bleConfig =
+            const BleConfig(connectionStabilizationDelay: Duration(seconds: 5));
+
+        final newConfig = FlutterThermalPrinter.instance.bleConfig;
+        expect(
+          newConfig.connectionStabilizationDelay,
+          const Duration(seconds: 5),
+        );
+
+        FlutterThermalPrinter.instance.bleConfig = originalConfig;
+      });
+
+      test('bleConfig getter returns current config', () {
+        final config1 = FlutterThermalPrinter.instance.bleConfig;
+        final config2 = FlutterThermalPrinter.instance.bleConfig;
+        expect(
+          config1.connectionStabilizationDelay,
+          config2.connectionStabilizationDelay,
+        );
+      });
+    });
   });
 
   group('Exports verification', () {
@@ -144,6 +178,12 @@ void main() {
     test('FlutterThermalPrinterNetwork is exported', () {
       final network = FlutterThermalPrinterNetwork('127.0.0.1');
       expect(network, isNotNull);
+    });
+
+    test('BleConfig is exported', () {
+      const config = BleConfig();
+      expect(config, isNotNull);
+      expect(config.connectionStabilizationDelay, const Duration(seconds: 10));
     });
   });
 }

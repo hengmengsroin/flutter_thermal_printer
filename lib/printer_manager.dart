@@ -12,6 +12,7 @@ import 'package:win32/win32.dart';
 import 'Windows/print_data.dart';
 import 'Windows/printers_data.dart';
 import 'flutter_thermal_printer_platform_interface.dart';
+import 'utils/ble_config.dart';
 import 'utils/printer.dart';
 
 /// Universal printer manager for all platforms
@@ -27,6 +28,12 @@ class PrinterManager {
     _instance ??= PrinterManager._privateConstructor();
     return _instance!;
   }
+
+  BleConfig _bleConfig = const BleConfig();
+
+  BleConfig get bleConfig => _bleConfig;
+
+  set bleConfig(BleConfig config) => _bleConfig = config;
 
   final StreamController<List<Printer>> _devicesStream =
       StreamController<List<Printer>>.broadcast();
@@ -84,7 +91,10 @@ class PrinterManager {
   }
 
   /// Connect to a printer device
-  Future<bool> connect(Printer device) async {
+  Future<bool> connect(
+    Printer device, {
+    Duration? connectionStabilizationDelay,
+  }) async {
     if (device.connectionType == ConnectionType.USB) {
       if (Platform.isWindows) {
         // Windows USB connection - device is already available, no connection needed
@@ -111,8 +121,10 @@ class PrinterManager {
         // Connect using universal_ble for all platforms including Windows
         await device.connect();
 
-        // Wait a moment to establish connection
-        await Future.delayed(const Duration(seconds: 10));
+        final delay = connectionStabilizationDelay ??
+            _bleConfig.connectionStabilizationDelay;
+        await Future.delayed(delay);
+
         return (await UniversalBle.getConnectionState(device.address!) ==
             BleConnectionState.connected);
       } catch (e) {

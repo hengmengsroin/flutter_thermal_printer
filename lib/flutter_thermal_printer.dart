@@ -8,10 +8,12 @@ import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
 
 import 'printer_manager.dart';
+import 'utils/ble_config.dart';
 import 'utils/printer.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 export 'package:flutter_thermal_printer/network/network_printer.dart';
+export 'package:flutter_thermal_printer/utils/ble_config.dart';
 export 'package:universal_ble/universal_ble.dart';
 
 /// Main class for thermal printer operations across all platforms
@@ -19,7 +21,8 @@ export 'package:universal_ble/universal_ble.dart';
 /// This class provides a unified interface for printing operations
 /// on Windows (USB/BLE) and other platforms (Android/iOS/macOS).
 class FlutterThermalPrinter {
-  FlutterThermalPrinter._();
+  FlutterThermalPrinter._({BleConfig bleConfig = const BleConfig()})
+      : _bleConfig = bleConfig;
 
   // ==========================================================================
   // STATIC VARIABLES AND INSTANCE
@@ -31,6 +34,19 @@ class FlutterThermalPrinter {
   static FlutterThermalPrinter get instance {
     _instance ??= FlutterThermalPrinter._();
     return _instance!;
+  }
+
+  // ==========================================================================
+  // BLE CONFIGURATION
+  // ==========================================================================
+
+  BleConfig _bleConfig;
+
+  BleConfig get bleConfig => _bleConfig;
+
+  set bleConfig(BleConfig config) {
+    _bleConfig = config;
+    PrinterManager.instance.bleConfig = config;
   }
 
   // ==========================================================================
@@ -50,8 +66,14 @@ class FlutterThermalPrinter {
   // ==========================================================================
 
   /// Connect to a printer device
-  Future<bool> connect(Printer device) async =>
-      PrinterManager.instance.connect(device);
+  Future<bool> connect(
+    Printer device, {
+    Duration? connectionStabilizationDelay,
+  }) async =>
+      PrinterManager.instance.connect(
+        device,
+        connectionStabilizationDelay: connectionStabilizationDelay,
+      );
 
   /// Disconnect from a printer device
   Future<void> disconnect(Printer device) async {
