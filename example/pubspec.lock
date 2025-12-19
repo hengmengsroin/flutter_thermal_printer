@@ -69,10 +69,10 @@ packages:
     dependency: transitive
     description:
       name: crypto
-      sha256: "1e445881f28f22d6140f181e07737b22f1e099a5e1ff94b0af2f9e4a463f4855"
+      sha256: c8ea0233063ba03258fbcf2ca4d6dadfefe14f02fab57702265467a19f27fadf
       url: "https://pub.dev"
     source: hosted
-    version: "3.0.6"
+    version: "3.0.7"
   csslib:
     dependency: transitive
     description:
@@ -158,7 +158,7 @@ packages:
       path: ".."
       relative: true
     source: path
-    version: "1.2.2"
+    version: "2.0.0"
   flutter_web_bluetooth:
     dependency: transitive
     description:
@@ -184,10 +184,10 @@ packages:
     dependency: transitive
     description:
       name: image
-      sha256: "4e973fcf4caae1a4be2fa0a13157aa38a8f9cb049db6529aa00b4d71abc4d928"
+      sha256: "48c11d0943b93b6fb29103d956ff89aafeae48f6058a3939649be2093dcff0bf"
       url: "https://pub.dev"
     source: hosted
-    version: "4.5.4"
+    version: "4.7.1"
   integration_test:
     dependency: "direct dev"
     description: flutter
@@ -197,10 +197,10 @@ packages:
     dependency: transitive
     description:
       name: leak_tracker
-      sha256: "8dcda04c3fc16c14f48a7bb586d4be1f0d1572731b6d81d51772ef47c02081e0"
+      sha256: "33e2e26bdd85a0112ec15400c8cbffea70d0f9c3407491f672a2fad47915e2de"
       url: "https://pub.dev"
     source: hosted
-    version: "11.0.1"
+    version: "11.0.2"
   leak_tracker_flutter_testing:
     dependency: transitive
     description:
@@ -253,10 +253,10 @@ packages:
     dependency: transitive
     description:
       name: meta
-      sha256: e3641ec5d63ebf0d9b41bd43201a66e3fc79a65db5f61fc181f04cd27aab950c
+      sha256: "23f08335362185a5ea2ad3a4e597f1375e78bce8a040df5c600c8d3552ef2394"
       url: "https://pub.dev"
     source: hosted
-    version: "1.16.0"
+    version: "1.17.0"
   path:
     dependency: transitive
     description:
@@ -370,10 +370,10 @@ packages:
     dependency: transitive
     description:
       name: test_api
-      sha256: "522f00f556e73044315fa4585ec3270f1808a4b186c936e612cab0b565ff1e00"
+      sha256: ab2726c1a94d3176a45960b6234466ec367179b87dd74f1611adb1f3b5fb9d55
       url: "https://pub.dev"
     source: hosted
-    version: "0.7.6"
+    version: "0.7.7"
   typed_data:
     dependency: transitive
     description:
@@ -386,10 +386,10 @@ packages:
     dependency: transitive
     description:
       name: universal_ble
-      sha256: "6a5c6c1fb295015934a5aef3dc751ae7e00721535275f8478bfe74db77b238c5"
+      sha256: "3ce1066d5f87be12a2842780c0286fbeac06e21a2e14f37e88e29c909469c1c1"
       url: "https://pub.dev"
     source: hosted
-    version: "0.21.1"
+    version: "1.0.0"
   vector_math:
     dependency: transitive
     description:
@@ -426,10 +426,10 @@ packages:
     dependency: transitive
     description:
       name: win32
-      sha256: "66814138c3562338d05613a6e368ed8cfb237ad6d64a9e9334be3f309acfca03"
+      sha256: d7cb55e04cd34096cd3a79b3330245f54cb96a370a1c27adb3c84b917de8b08e
       url: "https://pub.dev"
     source: hosted
-    version: "5.14.0"
+    version: "5.15.0"
   xml:
     dependency: transitive
     description:

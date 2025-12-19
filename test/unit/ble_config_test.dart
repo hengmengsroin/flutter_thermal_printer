@@ -7,7 +7,9 @@ void main() {
       test('uses default connectionStabilizationDelay of 10 seconds', () {
         const config = BleConfig();
         expect(
-            config.connectionStabilizationDelay, const Duration(seconds: 10));
+          config.connectionStabilizationDelay,
+          const Duration(seconds: 10),
+        );
       });
 
       test('accepts custom connectionStabilizationDelay', () {

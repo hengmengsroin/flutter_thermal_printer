@@ -2,7 +2,6 @@
 
 <img src="https://res.cloudinary.com/daagzbhsu/image/upload/v1735536729/vxobf0gilq0pixfsnjw1.png" />
 
-![Visits Badge](https://badges.pufler.dev/visits/SunilDevX/flutter_thermal_printer)
 
 
 ## Buy Me A Coffee
@@ -168,7 +167,7 @@ For bug reports or feature requests, feel free to open an issue.
 
 ## Contributors
 
-![Contributors Display](https://badges.pufler.dev/contributors/SunilDevX/flutter_thermal_printer?size=50&padding=5&perRow=10&bots=true)
+![Contributors](https://contrib.rocks/image?repo=SunilDevX/flutter_thermal_printer)
 
 
 Feel free to contribute to this project and help make it better for everyone!

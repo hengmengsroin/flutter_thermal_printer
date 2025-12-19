@@ -1,3 +1,19 @@
+## 2.0.0
+
+* **Major Refactoring & Code Quality Improvements**
+  - Fixed all linting and static analysis issues across the project.
+  - Improved null safety and type safety in `Printer` and `PrinterManager`.
+  - Refactored `Printer` class to correctly handle name overrides and data sanitization.
+  - Fixed Windows stub implementation for better cross-platform compatibility.
+
+* **Documentation**
+  - Added comprehensive DartDoc comments for all public methods in `FlutterThermalPrinter` and `PrinterManager`.
+  - Documented all parameters including `chunkSize`, `connectionStabilizationDelay`, and others.
+
+* **Testing**
+  - Fixed and updated unit tests to ensure reliability Thanks to `@LosDanieloss`.
+  - Verified behavior of `Printer` class serialization and initialization.
+
 ## 1.2.4
 * For windows and macos no chunking is required
 
