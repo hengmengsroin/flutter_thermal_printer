@@ -20,10 +20,10 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral/.symlinks/plugins/universal_ble/darwin
 
 SPEC CHECKSUMS:
-  flutter_thermal_printer: 89ad742652b32933223d893678c14cbd59579ed0
+  flutter_thermal_printer: e17510c2f9a687d7b1c96586495747e6ad16fea9
   FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
-  universal_ble: cf52a7b3fd2e7c14d6d7262e9fdadb72ab6b88a6
+  universal_ble: 65e1257dffc557cc7991a93d253beeddc7c1dc92
 
-PODFILE CHECKSUM: 3c8ad955ec40fb62e263a45c008146ad22756f7a
+PODFILE CHECKSUM: 86185b553e48c8685b3c0c73d1da77bf3fc4d159
 
 COCOAPODS: 1.16.2

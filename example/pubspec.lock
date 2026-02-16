@@ -117,10 +117,10 @@ packages:
     dependency: transitive
     description:
       name: ffi
-      sha256: "289279317b4b16eb2bb7e271abccd4bf84ec9bdcbe999e278a94b804f5630418"
+      sha256: "6d7fd89431262d8f3125e81b50d3847a091d846eafcd4fdb88dd06f36d705a45"
       url: "https://pub.dev"
     source: hosted
-    version: "2.1.4"
+    version: "2.2.0"
   file:
     dependency: transitive
     description:
@@ -184,10 +184,10 @@ packages:
     dependency: transitive
     description:
       name: image
-      sha256: "48c11d0943b93b6fb29103d956ff89aafeae48f6058a3939649be2093dcff0bf"
+      sha256: "492bd52f6c4fbb6ee41f781ff27765ce5f627910e1e0cbecfa3d9add5562604c"
       url: "https://pub.dev"
     source: hosted
-    version: "4.7.1"
+    version: "4.7.2"
   integration_test:
     dependency: "direct dev"
     description: flutter
@@ -386,10 +386,10 @@ packages:
     dependency: transitive
     description:
       name: universal_ble
-      sha256: "3ce1066d5f87be12a2842780c0286fbeac06e21a2e14f37e88e29c909469c1c1"
+      sha256: c7cba5aa7fcb64af769be90740382e391293943eef48aa0356c320c8ae3c609c
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.0"
+    version: "1.1.0"
   vector_math:
     dependency: transitive
     description:

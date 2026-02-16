@@ -37,6 +37,11 @@ class PrinterManager {
   StreamSubscription? _bleSubscription;
   StreamSubscription? _usbSubscription;
   StreamSubscription? _bleAvailabilitySubscription;
+  final Map<String, StreamSubscription<bool>> _bleConnectionSubscriptions =
+      <String, StreamSubscription<bool>>{};
+  Timer? _bleStateSyncTimer;
+  bool _isBleStateSyncInProgress = false;
+  static const Duration _bleStateSyncInterval = Duration(seconds: 3);
 
   static const String _channelName = 'flutter_thermal_printer/events';
   final EventChannel _eventChannel = const EventChannel(_channelName);
@@ -64,6 +69,7 @@ class PrinterManager {
   }) async {
     try {
       if (stopBle) {
+        await _stopBleStateSync();
         await _bleSubscription?.cancel();
         _bleSubscription = null;
         await UniversalBle.stopScan();
@@ -106,11 +112,16 @@ class PrinterManager {
           log('Device address is null');
           return false;
         }
+        final address = device.address!;
+        _ensureBleConnectionListener(address, fallbackName: device.name);
 
-        final isConnected =
-            (await UniversalBle.getConnectionState(device.address!) ==
-                BleConnectionState.connected);
+        final isConnected = await _isBleDeviceConnected(address);
         if (isConnected) {
+          _updateBleConnectionState(
+            address,
+            true,
+            fallbackName: device.name,
+          );
           log('Device ${device.name} is already connected');
           return true;
         }
@@ -133,13 +144,19 @@ class PrinterManager {
           await device.connect();
           final delay = connectionStabilizationDelay ??
               bleConfig.connectionStabilizationDelay;
-          return await connectionCompleter.future.timeout(
+          final connected = await connectionCompleter.future.timeout(
             delay,
             onTimeout: () {
               log('Connection to device ${device.name} timed out');
               return false;
             },
           );
+          _updateBleConnectionState(
+            address,
+            connected,
+            fallbackName: device.name,
+          );
+          return connected;
         } catch (e) {
           log('Error connecting to device: $e');
           return false;
@@ -168,7 +185,7 @@ class PrinterManager {
         if (device.address == null) {
           return false;
         }
-        return device.isConnected ?? false;
+        return await _isBleDeviceConnected(device.address!);
       } catch (e) {
         log('Failed to check connection status: $e');
         return false;
@@ -183,6 +200,11 @@ class PrinterManager {
       try {
         if (device.address != null) {
           await device.disconnect();
+          _updateBleConnectionState(
+            device.address!,
+            false,
+            fallbackName: device.name,
+          );
           log('Disconnected from device ${device.name}');
         }
       } catch (e) {
@@ -423,11 +445,20 @@ class PrinterManager {
         return;
       }
 
+      await _syncBleDevicesAndConnectionState();
+      _startBleStateSync();
+
       // Stop any ongoing scan
       await UniversalBle.stopScan();
 
       // Start scanning
-      await UniversalBle.startScan();
+      await UniversalBle.startScan(
+        platformConfig: PlatformConfig(
+          android: AndroidOptions(
+            requestLocationPermission: androidUsesFineLocation,
+          ),
+        ),
+      );
       log('Started BLE scan');
 
       sortDevices();
@@ -436,15 +467,14 @@ class PrinterManager {
       _bleSubscription = UniversalBle.scanStream.listen(
         (scanResult) async {
           if (scanResult.name?.isNotEmpty ?? false) {
+            final isConnected =
+                await _isBleDeviceConnected(scanResult.deviceId);
             _updateOrAddPrinter(
               Printer(
                 address: scanResult.deviceId,
                 name: scanResult.name,
                 connectionType: ConnectionType.BLE,
-                isConnected: await UniversalBle.getConnectionState(
-                      scanResult.deviceId,
-                    ) ==
-                    BleConnectionState.connected,
+                isConnected: isConnected,
               ),
             );
           }
@@ -461,14 +491,177 @@ class PrinterManager {
 
   /// Update or add printer to the devices list
   void _updateOrAddPrinter(Printer printer) {
-    final index =
-        _devices.indexWhere((device) => device.address == printer.address);
+    final index = _devices.indexWhere(
+      (device) =>
+          device.connectionType == printer.connectionType &&
+          device.address == printer.address,
+    );
     if (index == -1) {
       _devices.add(printer);
     } else {
       _devices[index] = printer;
     }
+    if (printer.connectionType == ConnectionType.BLE &&
+        (printer.address?.isNotEmpty ?? false)) {
+      _ensureBleConnectionListener(
+        printer.address!,
+        fallbackName: printer.name,
+      );
+    }
     sortDevices();
+  }
+
+  Future<bool> _isBleDeviceConnected(String deviceId) async {
+    try {
+      return await UniversalBle.getConnectionState(deviceId) ==
+          BleConnectionState.connected;
+    } catch (e) {
+      log('Failed to fetch BLE state for $deviceId: $e');
+      return false;
+    }
+  }
+
+  Future<void> _syncBleDevicesAndConnectionState() async {
+    if (_isBleStateSyncInProgress) {
+      return;
+    }
+    _isBleStateSyncInProgress = true;
+    try {
+      await _syncSystemBleDevices();
+      await _syncKnownBleConnectionStates();
+    } finally {
+      _isBleStateSyncInProgress = false;
+    }
+  }
+
+  Future<void> _syncSystemBleDevices() async {
+    try {
+      final systemDevices = await UniversalBle.getSystemDevices();
+      for (final device in systemDevices) {
+        final deviceId = device.deviceId;
+        if (deviceId.isEmpty) {
+          continue;
+        }
+        final deviceName = _normalizeDeviceName(device.name);
+        final isConnected = await _isBleDeviceConnected(deviceId);
+        _updateOrAddPrinter(
+          Printer(
+            address: deviceId,
+            name: deviceName,
+            connectionType: ConnectionType.BLE,
+            isConnected: isConnected,
+          ),
+        );
+      }
+    } catch (e) {
+      log('Failed to synchronize system BLE devices: $e');
+    }
+  }
+
+  Future<void> _syncKnownBleConnectionStates() async {
+    final bleDevices = _devices
+        .where(
+          (device) =>
+              device.connectionType == ConnectionType.BLE &&
+              (device.address?.isNotEmpty ?? false),
+        )
+        .toList(growable: false);
+
+    for (final device in bleDevices) {
+      final isConnected = await _isBleDeviceConnected(device.address!);
+      if (device.isConnected != isConnected) {
+        _updateOrAddPrinter(device.copyWith(isConnected: isConnected));
+      }
+    }
+  }
+
+  void _startBleStateSync() {
+    _bleStateSyncTimer?.cancel();
+    _bleStateSyncTimer = Timer.periodic(_bleStateSyncInterval, (_) {
+      unawaited(_syncBleDevicesAndConnectionState());
+    });
+  }
+
+  Future<void> _stopBleStateSync() async {
+    _bleStateSyncTimer?.cancel();
+    _bleStateSyncTimer = null;
+
+    final subscriptions = _bleConnectionSubscriptions.values.toList();
+    _bleConnectionSubscriptions.clear();
+    for (final subscription in subscriptions) {
+      await subscription.cancel();
+    }
+  }
+
+  void _ensureBleConnectionListener(
+    String deviceId, {
+    String? fallbackName,
+  }) {
+    if (_bleConnectionSubscriptions.containsKey(deviceId)) {
+      return;
+    }
+    _bleConnectionSubscriptions[deviceId] = UniversalBle.connectionStream(
+      deviceId,
+    ).listen(
+      (isConnected) {
+        _updateBleConnectionState(
+          deviceId,
+          isConnected,
+          fallbackName: fallbackName,
+        );
+      },
+      onError: (error) {
+        log('BLE connection stream error for $deviceId: $error');
+      },
+    );
+  }
+
+  void _updateBleConnectionState(
+    String deviceId,
+    bool isConnected, {
+    String? fallbackName,
+  }) {
+    final index = _devices.indexWhere(
+      (device) =>
+          device.connectionType == ConnectionType.BLE &&
+          device.address == deviceId,
+    );
+
+    if (index == -1) {
+      _updateOrAddPrinter(
+        Printer(
+          address: deviceId,
+          name: _normalizeDeviceName(fallbackName),
+          connectionType: ConnectionType.BLE,
+          isConnected: isConnected,
+        ),
+      );
+      return;
+    }
+
+    final current = _devices[index];
+    final normalizedFallbackName = _normalizeDeviceName(fallbackName);
+    final resolvedName = _normalizeDeviceName(current.name) ??
+        normalizedFallbackName ??
+        current.name;
+
+    if (current.isConnected == isConnected && current.name == resolvedName) {
+      return;
+    }
+
+    _devices[index] = current.copyWith(
+      isConnected: isConnected,
+      name: resolvedName,
+    );
+    sortDevices();
+  }
+
+  String? _normalizeDeviceName(String? name) {
+    final normalized = name?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return null;
+    }
+    return normalized;
   }
 
   /// Sort and filter devices
