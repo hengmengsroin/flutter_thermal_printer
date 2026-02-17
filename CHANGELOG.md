@@ -1,3 +1,10 @@
+## 2.0.1
+
+* Fixed BLE discovery to also include system-connected devices using `getSystemDevices()`.
+* Fixed BLE reconnect behavior so connection state updates correctly when reconnecting from system Bluetooth settings.
+* Added BLE connection-state synchronization and listener management to keep `devicesStream` in sync after disconnect/reconnect cycles.
+* Updated BLE scan initialization to honor Android fine-location permission settings through platform scan config.
+
 ## 2.0.0
 
 * **Major Refactoring & Code Quality Improvements**
