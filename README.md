@@ -2,7 +2,6 @@
 
 <img src="https://res.cloudinary.com/daagzbhsu/image/upload/v1735536729/vxobf0gilq0pixfsnjw1.png" />
 
-![Visits Badge](https://badges.pufler.dev/visits/SunilDevX/flutter_thermal_printer)
 
 
 ## Buy Me A Coffee
@@ -122,6 +121,30 @@ Handles long data by cropping images and printing them in chunks to ensure seaml
 ### BLE State Monitoring
 Provides real-time monitoring for Bluetooth states, ensuring proactive error handling and reconnections.
 
+### BLE Connection Configuration
+Customize BLE connection behavior to optimize for different printer models:
+
+```dart
+// Global configuration (applies to all BLE connections)
+FlutterThermalPrinter.instance.bleConfig =
+    BleConfig(connectionStabilizationDelay: Duration(seconds: 3));
+
+// Per-connection override for specific devices
+await FlutterThermalPrinter.instance.connect(
+  printer,
+  connectionStabilizationDelay: Duration(seconds: 2),
+);
+
+// Default behavior (10 seconds) - no configuration needed
+await FlutterThermalPrinter.instance.connect(printer);
+```
+
+| Configuration | Use Case |
+|---------------|----------|
+| Global config | Set once for consistent behavior across all connections |
+| Per-call override | Fine-tune for specific printer models that connect faster/slower |
+| Default (10s) | Backwards compatible, works with most printers |
+
 ---
 
 ## Notes and Recommendations
@@ -144,7 +167,7 @@ For bug reports or feature requests, feel free to open an issue.
 
 ## Contributors
 
-![Contributors Display](https://badges.pufler.dev/contributors/SunilDevX/flutter_thermal_printer?size=50&padding=5&perRow=10&bots=true)
+![Contributors](https://contrib.rocks/image?repo=SunilDevX/flutter_thermal_printer)
 
 
 Feel free to contribute to this project and help make it better for everyone!

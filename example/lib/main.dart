@@ -52,6 +52,9 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+      _flutterThermalPrinterPlugin.bleConfig = const BleConfig(
+        connectionStabilizationDelay: Duration(seconds: 3),
+      );
       startScan();
     });
   }
@@ -192,8 +195,8 @@ class _MyAppState extends State<MyApp> {
                         }
                       },
                       title: Text(printers[index].name ?? 'No Name'),
-                      subtitle:
-                          Text("Connected: ${printers[index].isConnected}"),
+                      subtitle: Text(
+                          "Connected: ${printers[index].isConnected ?? false}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {

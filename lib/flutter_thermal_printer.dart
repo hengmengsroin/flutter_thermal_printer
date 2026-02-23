@@ -8,10 +8,12 @@ import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
 
 import 'printer_manager.dart';
+import 'utils/ble_config.dart';
 import 'utils/printer.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 export 'package:flutter_thermal_printer/network/network_printer.dart';
+export 'package:flutter_thermal_printer/utils/ble_config.dart';
 export 'package:universal_ble/universal_ble.dart';
 
 /// Main class for thermal printer operations across all platforms
@@ -19,7 +21,8 @@ export 'package:universal_ble/universal_ble.dart';
 /// This class provides a unified interface for printing operations
 /// on Windows (USB/BLE) and other platforms (Android/iOS/macOS).
 class FlutterThermalPrinter {
-  FlutterThermalPrinter._();
+  FlutterThermalPrinter._({BleConfig bleConfig = const BleConfig()})
+      : _bleConfig = bleConfig;
 
   // ==========================================================================
   // STATIC VARIABLES AND INSTANCE
@@ -31,6 +34,19 @@ class FlutterThermalPrinter {
   static FlutterThermalPrinter get instance {
     _instance ??= FlutterThermalPrinter._();
     return _instance!;
+  }
+
+  // ==========================================================================
+  // BLE CONFIGURATION
+  // ==========================================================================
+
+  BleConfig _bleConfig;
+
+  BleConfig get bleConfig => _bleConfig;
+
+  set bleConfig(BleConfig config) {
+    _bleConfig = config;
+    PrinterManager.instance.bleConfig = config;
   }
 
   // ==========================================================================
@@ -50,8 +66,18 @@ class FlutterThermalPrinter {
   // ==========================================================================
 
   /// Connect to a printer device
-  Future<bool> connect(Printer device) async =>
-      PrinterManager.instance.connect(device);
+  ///
+  /// [device] The printer device to connect to.
+  /// [connectionStabilizationDelay] Optional delay to wait after connection is established
+  /// before considering it stable. Defaults to [BleConfig.connectionStabilizationDelay].
+  Future<bool> connect(
+    Printer device, {
+    Duration? connectionStabilizationDelay,
+  }) async =>
+      PrinterManager.instance.connect(
+        device,
+        connectionStabilizationDelay: connectionStabilizationDelay,
+      );
 
   /// Disconnect from a printer device
   Future<void> disconnect(Printer device) async {
@@ -59,6 +85,11 @@ class FlutterThermalPrinter {
   }
 
   /// Print raw data to printer
+  ///
+  /// [device] The printer device to print to.
+  /// [bytes] The raw bytes to print.
+  /// [longData] Whether the data is long and should be split into chunks.
+  /// [chunkSize] The size of each chunk if [longData] is true.
   Future<void> printData(
     Printer device,
     List<int> bytes, {
@@ -68,6 +99,11 @@ class FlutterThermalPrinter {
       PrinterManager.instance.printData(
         device,
         bytes,
+
+        ///
+        /// [refreshDuration] The duration between each scan refresh.
+        /// [connectionTypes] List of connection types to scan for (BLE, USB).
+        /// [androidUsesFineLocation] Whether to use fine location on Android for BLE scanning.
         longData: longData,
         chunkSize: chunkSize,
       );
@@ -97,6 +133,14 @@ class FlutterThermalPrinter {
   Future<void> turnOnBluetooth() async {
     await PrinterManager.instance.turnOnBluetooth();
   }
+
+  ///
+  /// [context] The build context.
+  /// [widget] The widget to capture.
+  /// [delay] Delay before capturing the screenshot.
+  /// [customWidth] Optional custom width for the image.
+  /// [paperSize] The paper size of the printer.
+  /// [generator] Optional ESC/POS generator.
 
   /// Check if Bluetooth is turned on
   Future<bool> isBleTurnedOn() async => PrinterManager.instance.isBleTurnedOn();
@@ -133,6 +177,16 @@ class FlutterThermalPrinter {
 
       // Apply custom width if specified
       if (customWidth != null) {
+        ///
+        /// [context] The build context.
+        /// [printer] The printer to print to.
+        /// [widget] The widget to print.
+        /// [delay] Delay before capturing the screenshot.
+        /// [paperSize] The paper size of the printer.
+        /// [profile] Optional capability profile.
+        /// [printOnBle] Whether to print on BLE (deprecated/unused parameter?).
+        /// [cutAfterPrinted] Whether to cut the paper after printing.
+        /// [chunkSize] The size of chunks for data transmission.
         final width = _makeDivisibleBy8(customWidth);
         imagebytes = img.copyResize(imagebytes, width: width);
       }

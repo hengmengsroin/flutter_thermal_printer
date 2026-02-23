@@ -31,6 +31,7 @@ class Printer extends BleDevice {
   }
 
   @override
+  // ignore: overridden_fields
   final String? name;
   final String? address;
   final ConnectionType? connectionType;

@@ -1,3 +1,26 @@
+## 2.0.1
+
+* Fixed BLE discovery to also include system-connected devices using `getSystemDevices()`.
+* Fixed BLE reconnect behavior so connection state updates correctly when reconnecting from system Bluetooth settings.
+* Added BLE connection-state synchronization and listener management to keep `devicesStream` in sync after disconnect/reconnect cycles.
+* Updated BLE scan initialization to honor Android fine-location permission settings through platform scan config.
+
+## 2.0.0
+
+* **Major Refactoring & Code Quality Improvements**
+  - Fixed all linting and static analysis issues across the project.
+  - Improved null safety and type safety in `Printer` and `PrinterManager`.
+  - Refactored `Printer` class to correctly handle name overrides and data sanitization.
+  - Fixed Windows stub implementation for better cross-platform compatibility.
+
+* **Documentation**
+  - Added comprehensive DartDoc comments for all public methods in `FlutterThermalPrinter` and `PrinterManager`.
+  - Documented all parameters including `chunkSize`, `connectionStabilizationDelay`, and others.
+
+* **Testing**
+  - Fixed and updated unit tests to ensure reliability Thanks to `@LosDanieloss`.
+  - Verified behavior of `Printer` class serialization and initialization.
+
 ## 1.2.4
 * For windows and macos no chunking is required
 
