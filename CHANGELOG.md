@@ -1,3 +1,13 @@
+## 1.2.4
+* For windows and macos no chunking is required
+
+## 1.2.3+1
+* Updated BLE MTU query or pass custom chunksize
+
+## 1.2.3
+* Added Full Support for USB on Macos
+* Changed Flutter_blue_plus to universal_ble for better support of BLE and Classic Devices
+
 ## 1.2.2 - Optimized Version
 
 * **Enhanced Memory Management**

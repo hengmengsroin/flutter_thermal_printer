@@ -1,22 +1,24 @@
 // ignore_for_file: constant_identifier_names
 
+import 'package:universal_ble/universal_ble.dart';
+
 /// Optimized printer model with better data validation and serialization
-class Printer {
-  const Printer({
+class Printer extends BleDevice {
+  Printer({
     this.address,
     this.name,
     this.connectionType,
     this.isConnected,
     this.vendorId,
     this.productId,
-  });
+  }) : super(deviceId: address ?? '', name: name ?? '');
 
   /// Create Printer from JSON with validation
   factory Printer.fromJson(Map<String, dynamic> json) {
     try {
       return Printer(
         address: json['address'] as String?,
-        name: _extractName(json),
+        name: json['name'] as String?,
         connectionType:
             _getConnectionTypeFromString(json['connectionType'] as String?),
         isConnected: json['isConnected'] as bool?,
@@ -27,34 +29,21 @@ class Printer {
       throw FormatException('Invalid Printer JSON format: $e');
     }
   }
-  final String? address;
+
+  @override
   final String? name;
+  final String? address;
   final ConnectionType? connectionType;
   final bool? isConnected;
   final String? vendorId;
   final String? productId;
-
-  /// Extract name based on connection type
-  static String? _extractName(Map<String, dynamic> json) {
-    final connectionType = json['connectionType'] as String?;
-    if (connectionType == 'BLE') {
-      return json['platformName'] as String?;
-    }
-    return json['name'] as String?;
-  }
 
   /// Convert to JSON with proper formatting
   Map<String, dynamic> toJson() {
     final data = <String, dynamic>{};
 
     data['address'] = address;
-
-    if (connectionType == ConnectionType.BLE) {
-      data['platformName'] = name;
-    } else {
-      data['name'] = name;
-    }
-
+    data['name'] = name;
     data['connectionType'] = connectionType?.name;
     data['isConnected'] = isConnected;
     data['vendorId'] = vendorId;

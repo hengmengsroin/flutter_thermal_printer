@@ -23,10 +23,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
 
   @override
   Future<bool> connect(Printer device) async =>
-      await methodChannel.invokeMethod('connect', {
-        'vendorId': device.vendorId.toString(),
-        'productId': device.productId.toString(),
-      });
+      await methodChannel.invokeMethod('connect', device.toJson());
 
   @override
   Future<bool> printText(
@@ -37,16 +34,14 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
       await methodChannel.invokeMethod('printText', {
         'vendorId': device.vendorId.toString(),
         'productId': device.productId.toString(),
+        'name': device.name,
         'data': List<int>.from(data),
         'path': path ?? '',
       });
 
   @override
   Future<bool> isConnected(Printer device) async =>
-      await methodChannel.invokeMethod('isConnected', {
-        'vendorId': device.vendorId.toString(),
-        'productId': device.productId.toString(),
-      });
+      await methodChannel.invokeMethod('isConnected', device.toJson());
 
   @override
   Future<dynamic> convertImageToGrayscale(Uint8List? value) async =>

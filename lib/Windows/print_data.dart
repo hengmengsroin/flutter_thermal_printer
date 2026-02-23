@@ -5,14 +5,14 @@
 
 import 'dart:ffi';
 import 'dart:typed_data';
+
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
 class RawPrinter {
+  RawPrinter(this.printerName, this.alloc);
   final String printerName;
   final Arena alloc;
-
-  RawPrinter(this.printerName, this.alloc);
 
   void printEscPosWin32(List<int> data) {
     final hPrinter = calloc<HANDLE>();
@@ -34,7 +34,12 @@ class RawPrinter {
         final buffer = Uint8List.fromList(data);
         final bytesWritten = calloc<DWORD>();
 
-        WritePrinter(printerHandle, buffer.allocatePointer(), buffer.length, bytesWritten);
+        WritePrinter(
+          printerHandle,
+          buffer.allocatePointer(),
+          buffer.length,
+          bytesWritten,
+        );
 
         EndPagePrinter(printerHandle);
         EndDocPrinter(printerHandle);
@@ -43,9 +48,10 @@ class RawPrinter {
       ClosePrinter(printerHandle);
     }
 
-    calloc.free(printerNamePtr);
-    calloc.free(docNamePtr);
-    calloc.free(hPrinter);
-    calloc.free(docInfo);
+    calloc
+      ..free(printerNamePtr)
+      ..free(docNamePtr)
+      ..free(hPrinter)
+      ..free(docInfo);
   }
 }
